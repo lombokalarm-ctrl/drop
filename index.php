@@ -537,6 +537,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
                         <div class="field-grid">
                             <label>
+                                <span>Tanggal Pembuatan</span>
+                                <input type="text" value="<?= htmlspecialchars(formatDateTimeId((string)$formData['created_at']), ENT_QUOTES, 'UTF-8') ?>" readonly>
+                            </label>
+
+                            <label>
+                                <span>Nama Sales</span>
+                                <input type="text" name="sales_name" value="<?= htmlspecialchars((string)$formData['sales_name'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama sales" <?= $currentUser['role'] === 'sales' ? 'readonly' : '' ?> required>
+                            </label>
+
+                            <label>
                                 <span>Kode Outlet</span>
                                 <input type="text" name="outlet_code" value="<?= htmlspecialchars((string)$formData['outlet_code'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Mis. OTL-001" required>
                             </label>
@@ -554,16 +564,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                             <label>
                                 <span>Nilai Nota</span>
                                 <input type="text" name="invoice_value" data-currency data-role="invoice-value" value="<?= htmlspecialchars((string)$formData['invoice_value'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Contoh: 1250000" inputmode="numeric" required>
-                            </label>
-
-                            <label>
-                                <span>Tanggal Pembuatan</span>
-                                <input type="text" value="<?= htmlspecialchars(formatDateTimeId((string)$formData['created_at']), ENT_QUOTES, 'UTF-8') ?>" readonly>
-                            </label>
-
-                            <label>
-                                <span>Nama Sales</span>
-                                <input type="text" name="sales_name" value="<?= htmlspecialchars((string)$formData['sales_name'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama sales" <?= $currentUser['role'] === 'sales' ? 'readonly' : '' ?> required>
                             </label>
                         </div>
 
