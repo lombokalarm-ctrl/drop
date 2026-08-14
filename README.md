@@ -103,6 +103,7 @@ Setelah migrasi selesai, aplikasi akan langsung memakai MySQL / MariaDB karena k
 - Data arsip tidak tampil di halaman utama, tetapi masih bisa dilihat di halaman arsip sampai dihapus permanen.
 - Mode daftar nota terpisah hanya aktif untuk tampilan smartphone yang dibuka sebagai PWA, bukan browser desktop biasa.
 - Card input nota baru tidak lagi memiliki kolom nominal bayar; pembayaran dilakukan dari tombol `Bayar` pada daftar nota.
+- Field `pengirim` tidak diisi dari form nota baru, tetapi lewat tombol `Input Pengirim` di daftar nota sesuai role yang diizinkan.
 - Role `sales` hanya bisa melihat dan mengelola nota yang dia buat sendiri.
 - Role `admin` bisa mengelola nota dan melihat arsip, tetapi tidak bisa kelola user.
 - Role `owner` punya akses penuh, termasuk kelola user dan hapus permanen arsip.

@@ -10,8 +10,12 @@ $isArchivePage = $currentPage === 'arsip';
 $editId = isset($_GET['edit']) ? (int)$_GET['edit'] : 0;
 $editData = $editId > 0 ? findNota($pdo, $editId) : null;
 $payData = null;
+$senderData = null;
 $paymentFormData = [
     'payment_increment' => '',
+];
+$senderFormData = [
+    'sender_name' => '',
 ];
 
 if ($isArchivePage && !canViewArchive($currentUser)) {
@@ -139,7 +143,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    if ($action !== 'save' && $action !== 'pay' && $action !== 'archive' && $action !== 'delete_permanent') {
+    if ($action === 'update_sender') {
+        $id = (int)($_POST['id'] ?? 0);
+        $senderData = $id > 0 ? findNota($pdo, $id) : null;
+        $senderName = trim((string)($_POST['sender_name'] ?? ''));
+        $senderFormData = [
+            'sender_name' => $senderName,
+        ];
+
+        if (!$senderData) {
+            $errors[] = 'Data nota yang ingin diisi pengirimnya tidak ditemukan.';
+        } elseif ($senderData['archived_at'] !== null) {
+            $errors[] = 'Data arsip tidak bisa diubah pengirimnya dari halaman utama.';
+        } elseif (!canManageSender($currentUser, $senderData)) {
+            $errors[] = 'Role Anda tidak memiliki izin untuk mengisi data pengirim.';
+        } elseif ($senderName === '') {
+            $errors[] = 'Nama pengirim wajib diisi.';
+        }
+
+        if ($errors === []) {
+            $statement = $pdo->prepare(
+                'UPDATE nota_dropping
+                SET sender_name = :sender_name,
+                    updated_at = :updated_at,
+                    updated_by_user_id = :updated_by_user_id
+                WHERE id = :id'
+            );
+            $statement->execute([
+                'id' => $id,
+                'sender_name' => $senderName,
+                'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'updated_by_user_id' => (int)$currentUser['id'],
+            ]);
+
+            setFlash('success', 'Data pengirim berhasil disimpan.');
+            redirectToIndex($redirectParams);
+        }
+    }
+
+    if ($action !== 'save' && $action !== 'pay' && $action !== 'archive' && $action !== 'delete_permanent' && $action !== 'update_sender') {
         setFlash('error', 'Aksi tidak dikenali.');
         redirectToIndex($redirectParams);
     }
@@ -149,13 +191,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $existingData = $id > 0 ? findNota($pdo, $id) : null;
         $outletCode = trim((string)($_POST['outlet_code'] ?? ''));
         $outletName = trim((string)($_POST['outlet_name'] ?? ''));
-        $invoiceDate = trim((string)($_POST['invoice_date'] ?? ''));
+        $invoiceDateInput = trim((string)($_POST['invoice_date'] ?? ''));
+        $invoiceDate = parseDateIdInput($invoiceDateInput);
         $invoiceValue = (int)preg_replace('/\D+/', '', (string)($_POST['invoice_value'] ?? '0'));
         $salesName = $currentUser['role'] === 'sales'
             ? (string)$currentUser['full_name']
             : trim((string)($_POST['sales_name'] ?? ''));
         $paymentAmount = $existingData ? (int)$existingData['payment_amount'] : 0;
-        $senderName = trim((string)($_POST['sender_name'] ?? ''));
+        $senderName = $existingData ? (string)$existingData['sender_name'] : '';
 
         if ($id === 0 && !canCreateNote($currentUser)) {
             $errors[] = 'Role Anda tidak diizinkan menambah nota baru.';
@@ -167,8 +210,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($outletName === '') {
             $errors[] = 'Nama outlet wajib diisi.';
         }
-        if ($invoiceDate === '') {
+        if ($invoiceDateInput === '') {
             $errors[] = 'Tanggal nota wajib diisi.';
+        } elseif ($invoiceDate === null) {
+            $errors[] = 'Tanggal nota harus diisi manual dengan format dd-mm-yyyy.';
         }
         if ($invoiceValue <= 0) {
             $errors[] = 'Nilai nota harus lebih dari 0.';
@@ -181,10 +226,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($existingData && !canEditNote($currentUser, $existingData)) {
             $errors[] = 'Anda tidak memiliki izin untuk memperbarui nota ini.';
         }
-        if ($senderName === '') {
-            $errors[] = 'Pengirim wajib diisi.';
-        }
-
         if ($errors === []) {
             $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');
             $paymentStatus = calculatePaymentStatus($invoiceValue, $paymentAmount);
@@ -496,11 +537,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
                         <div class="field-grid">
                             <label>
-                                <span>Tanggal Pembuatan</span>
-                                <input type="text" value="<?= htmlspecialchars(formatDateTimeId((string)$formData['created_at']), ENT_QUOTES, 'UTF-8') ?>" readonly>
-                            </label>
-
-                            <label>
                                 <span>Kode Outlet</span>
                                 <input type="text" name="outlet_code" value="<?= htmlspecialchars((string)$formData['outlet_code'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Mis. OTL-001" required>
                             </label>
@@ -512,7 +548,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
                             <label>
                                 <span>Tanggal Nota</span>
-                                <input type="date" name="invoice_date" value="<?= htmlspecialchars((string)$formData['invoice_date'], ENT_QUOTES, 'UTF-8') ?>" required>
+                                <input type="text" name="invoice_date" value="<?= htmlspecialchars((string)($formData['invoice_date'] !== '' ? formatDateId((string)$formData['invoice_date']) : ''), ENT_QUOTES, 'UTF-8') ?>" placeholder="dd-mm-yyyy" inputmode="numeric" required>
                             </label>
 
                             <label>
@@ -521,18 +557,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                             </label>
 
                             <label>
-                                <span>Nama Sales</span>
-                                <input type="text" name="sales_name" value="<?= htmlspecialchars((string)$formData['sales_name'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama sales" <?= $currentUser['role'] === 'sales' ? 'readonly' : '' ?> required>
+                                <span>Tanggal Pembuatan</span>
+                                <input type="text" value="<?= htmlspecialchars(formatDateTimeId((string)$formData['created_at']), ENT_QUOTES, 'UTF-8') ?>" readonly>
                             </label>
 
                             <label>
-                                <span>Status Saat Ini</span>
-                                <input type="text" value="<?= $formData['payment_status'] === 'sudah_bayar' ? 'Lunas' : 'Masih Hutang' ?>" readonly>
-                            </label>
-
-                            <label class="full">
-                                <span>Pengirim</span>
-                                <input type="text" name="sender_name" value="<?= htmlspecialchars((string)$formData['sender_name'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama pengirim barang / nota" required>
+                                <span>Nama Sales</span>
+                                <input type="text" name="sales_name" value="<?= htmlspecialchars((string)$formData['sales_name'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama sales" <?= $currentUser['role'] === 'sales' ? 'readonly' : '' ?> required>
                             </label>
                         </div>
 
@@ -617,7 +648,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                                 <?= $row['payment_status'] === 'sudah_bayar' ? 'Lunas' : 'Masih Hutang' ?>
                                             </span>
                                         </td>
-                                        <td><?= htmlspecialchars($row['sender_name'], ENT_QUOTES, 'UTF-8') ?></td>
+                                        <td><?= htmlspecialchars($row['sender_name'] !== '' ? $row['sender_name'] : '-', ENT_QUOTES, 'UTF-8') ?></td>
                                         <td>
                                             <div class="action-group">
                                                 <?php if ($isArchivePage): ?>
@@ -654,6 +685,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                                     <?php if (canEditNote($currentUser, $row)): ?>
                                                         <a class="btn btn-small btn-secondary" href="index.php?edit=<?= (int)$row['id'] ?>">Edit</a>
                                                     <?php endif; ?>
+                                                    <?php if (canManageSender($currentUser, $row)): ?>
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-small btn-secondary js-open-sender-modal"
+                                                            data-id="<?= (int)$row['id'] ?>"
+                                                            data-outlet="<?= htmlspecialchars($row['outlet_name'] . ' (' . $row['outlet_code'] . ')', ENT_QUOTES, 'UTF-8') ?>"
+                                                            data-invoice-date="<?= htmlspecialchars(formatDateId($row['invoice_date']), ENT_QUOTES, 'UTF-8') ?>"
+                                                            data-sales-name="<?= htmlspecialchars($row['sales_name'], ENT_QUOTES, 'UTF-8') ?>"
+                                                            data-sender-name="<?= htmlspecialchars($row['sender_name'], ENT_QUOTES, 'UTF-8') ?>"
+                                                        >
+                                                            <?= $row['sender_name'] !== '' ? 'Edit Pengirim' : 'Input Pengirim' ?>
+                                                        </button>
+                                                    <?php endif; ?>
                                                     <?php if (canArchiveNote($currentUser, $row)): ?>
                                                         <form method="post" onsubmit="return confirm('Arsipkan data nota ini?');">
                                                             <input type="hidden" name="action" value="archive">
@@ -680,6 +724,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             $modalInvoice = $payData ? (int)$payData['invoice_value'] : 0;
             $modalRemaining = $payData ? getRemainingAmount($modalInvoice, $modalPayment) : 0;
             $modalIncrement = $paymentFormData['payment_increment'] !== '' ? (int)$paymentFormData['payment_increment'] : $modalRemaining;
+            $modalSenderValue = $senderData ? (string)$senderData['sender_name'] : $senderFormData['sender_name'];
             ?>
             <div class="pay-modal-overlay<?= $payData ? ' is-open' : '' ?>" id="payModalOverlay" aria-hidden="<?= $payData ? 'false' : 'true' ?>">
                 <div class="pay-modal card" role="dialog" aria-modal="true" aria-labelledby="payModalTitle">
@@ -747,6 +792,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                     </form>
                 </div>
             </div>
+
+            <div class="pay-modal-overlay<?= $senderData ? ' is-open' : '' ?>" id="senderModalOverlay" aria-hidden="<?= $senderData ? 'false' : 'true' ?>">
+                <div class="pay-modal card" role="dialog" aria-modal="true" aria-labelledby="senderModalTitle">
+                    <div class="section-head pay-modal-head">
+                        <h2 id="senderModalTitle">Input Pengirim</h2>
+                        <button type="button" class="btn btn-secondary btn-small" id="closeSenderModalButton">Tutup</button>
+                    </div>
+
+                    <form method="post" class="nota-form" id="senderModalForm">
+                        <input type="hidden" name="action" value="update_sender">
+                        <input type="hidden" name="page" value="">
+                        <input type="hidden" name="id" id="senderModalId" value="<?= $senderData ? (int)$senderData['id'] : 0 ?>">
+
+                        <div class="field-grid">
+                            <label>
+                                <span>Outlet</span>
+                                <input type="text" id="senderModalOutlet" value="<?= htmlspecialchars($senderData ? $senderData['outlet_name'] . ' (' . $senderData['outlet_code'] . ')' : '', ENT_QUOTES, 'UTF-8') ?>" readonly>
+                            </label>
+
+                            <label>
+                                <span>Tanggal Nota</span>
+                                <input type="text" id="senderModalInvoiceDate" value="<?= htmlspecialchars($senderData ? formatDateId($senderData['invoice_date']) : '', ENT_QUOTES, 'UTF-8') ?>" readonly>
+                            </label>
+
+                            <label>
+                                <span>Nama Sales</span>
+                                <input type="text" id="senderModalSalesName" value="<?= htmlspecialchars($senderData['sales_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>" readonly>
+                            </label>
+
+                            <label>
+                                <span>Pengirim</span>
+                                <input type="text" name="sender_name" id="senderModalSenderName" value="<?= htmlspecialchars($modalSenderValue, ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama team gudang / pengirim" required>
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Simpan Pengirim</button>
+                            <button type="button" class="btn btn-secondary" id="cancelSenderModalButton">Batal</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         <?php endif; ?>
     </main>
 
@@ -767,6 +854,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
         const closePayModalButton = document.getElementById('closePayModalButton');
         const cancelPayModalButton = document.getElementById('cancelPayModalButton');
         const payModalTriggers = document.querySelectorAll('.js-open-pay-modal');
+        const senderModalOverlay = document.getElementById('senderModalOverlay');
+        const senderModalIdInput = document.getElementById('senderModalId');
+        const senderModalOutletInput = document.getElementById('senderModalOutlet');
+        const senderModalInvoiceDateInput = document.getElementById('senderModalInvoiceDate');
+        const senderModalSalesNameInput = document.getElementById('senderModalSalesName');
+        const senderModalSenderNameInput = document.getElementById('senderModalSenderName');
+        const closeSenderModalButton = document.getElementById('closeSenderModalButton');
+        const cancelSenderModalButton = document.getElementById('cancelSenderModalButton');
+        const senderModalTriggers = document.querySelectorAll('.js-open-sender-modal');
 
         const formatNumber = (value) => {
             const digits = value.replace(/\D/g, '');
@@ -827,6 +923,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             document.body.classList.remove('modal-open');
         };
 
+        const openSenderModal = (payload) => {
+            if (!senderModalOverlay || !senderModalIdInput || !senderModalOutletInput || !senderModalInvoiceDateInput || !senderModalSalesNameInput || !senderModalSenderNameInput) {
+                return;
+            }
+
+            senderModalIdInput.value = payload.id || '';
+            senderModalOutletInput.value = payload.outlet || '';
+            senderModalInvoiceDateInput.value = payload.invoiceDate || '';
+            senderModalSalesNameInput.value = payload.salesName || '';
+            senderModalSenderNameInput.value = payload.senderName || '';
+
+            senderModalOverlay.classList.add('is-open');
+            senderModalOverlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('modal-open');
+            senderModalSenderNameInput.focus();
+            senderModalSenderNameInput.select();
+        };
+
+        const closeSenderModal = () => {
+            if (!senderModalOverlay) {
+                return;
+            }
+
+            senderModalOverlay.classList.remove('is-open');
+            senderModalOverlay.setAttribute('aria-hidden', 'true');
+
+            if (!payModalOverlay || !payModalOverlay.classList.contains('is-open')) {
+                document.body.classList.remove('modal-open');
+            }
+        };
+
         currencyInputs.forEach((input) => {
             input.value = formatNumber(input.value);
             input.addEventListener('input', (event) => {
@@ -853,6 +980,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             });
         });
 
+        senderModalTriggers.forEach((button) => {
+            button.addEventListener('click', () => {
+                openSenderModal({
+                    id: button.dataset.id,
+                    outlet: button.dataset.outlet,
+                    invoiceDate: button.dataset.invoiceDate,
+                    salesName: button.dataset.salesName,
+                    senderName: button.dataset.senderName,
+                });
+            });
+        });
+
         if (closePayModalButton) {
             closePayModalButton.addEventListener('click', closePayModal);
         }
@@ -869,15 +1008,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             });
         }
 
+        if (closeSenderModalButton) {
+            closeSenderModalButton.addEventListener('click', closeSenderModal);
+        }
+
+        if (cancelSenderModalButton) {
+            cancelSenderModalButton.addEventListener('click', closeSenderModal);
+        }
+
+        if (senderModalOverlay) {
+            senderModalOverlay.addEventListener('click', (event) => {
+                if (event.target === senderModalOverlay) {
+                    closeSenderModal();
+                }
+            });
+        }
+
         window.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && payModalOverlay && payModalOverlay.classList.contains('is-open')) {
                 closePayModal();
+            }
+
+            if (event.key === 'Escape' && senderModalOverlay && senderModalOverlay.classList.contains('is-open')) {
+                closeSenderModal();
             }
         });
 
         if (payModalOverlay && payModalOverlay.classList.contains('is-open')) {
             document.body.classList.add('modal-open');
             updatePayPreview();
+        }
+
+        if (senderModalOverlay && senderModalOverlay.classList.contains('is-open')) {
+            document.body.classList.add('modal-open');
         }
 
         const installButton = document.getElementById('installAppButton');

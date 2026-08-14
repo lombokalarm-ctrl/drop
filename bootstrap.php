@@ -384,6 +384,26 @@ function formatDateId(?string $date): string
     return $dateTime ? $dateTime->format('d-m-Y') : $date;
 }
 
+function parseDateIdInput(?string $date): ?string
+{
+    $value = trim((string)$date);
+    if ($value === '') {
+        return null;
+    }
+
+    $dateTime = DateTimeImmutable::createFromFormat('d-m-Y', $value);
+    $errors = DateTimeImmutable::getLastErrors();
+
+    if (
+        $dateTime === false
+        || ($errors !== false && (($errors['warning_count'] ?? 0) > 0 || ($errors['error_count'] ?? 0) > 0))
+    ) {
+        return null;
+    }
+
+    return $dateTime->format('Y-m-d');
+}
+
 function formatDateTimeId(?string $dateTime): string
 {
     if (!$dateTime) {
@@ -515,6 +535,15 @@ function canPayNote(array $user, array $note): bool
     }
 
     return $user['role'] === 'sales' && (int)($note['created_by_user_id'] ?? 0) === (int)$user['id'];
+}
+
+function canManageSender(array $user, array $note): bool
+{
+    if (in_array($user['role'], ['owner', 'admin'], true)) {
+        return true;
+    }
+
+    return false;
 }
 
 function canCreateNote(array $user): bool
