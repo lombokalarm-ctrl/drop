@@ -152,13 +152,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $statement = $pdo->query(
-    'SELECT
+    "SELECT
         COUNT(*) AS total_user,
         SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS total_aktif,
-        SUM(CASE WHEN role = "owner" THEN 1 ELSE 0 END) AS total_owner,
-        SUM(CASE WHEN role = "admin" THEN 1 ELSE 0 END) AS total_admin,
-        SUM(CASE WHEN role = "sales" THEN 1 ELSE 0 END) AS total_sales
-    FROM users'
+        SUM(CASE WHEN role = 'owner' THEN 1 ELSE 0 END) AS total_owner,
+        SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS total_admin,
+        SUM(CASE WHEN role = 'sales' THEN 1 ELSE 0 END) AS total_sales
+    FROM users"
 );
 $summary = $statement->fetch() ?: [];
 

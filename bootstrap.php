@@ -3,8 +3,6 @@ declare(strict_types=1);
 
 $storagePath = __DIR__ . '/storage';
 $sessionPath = $storagePath . '/sessions';
-$databasePath = $storagePath . '/database.sqlite';
-$dsn = 'sqlite:' . $databasePath;
 
 if (!is_dir($storagePath)) {
     mkdir($storagePath, 0777, true);
@@ -14,82 +12,315 @@ if (!is_dir($sessionPath)) {
     mkdir($sessionPath, 0777, true);
 }
 
-session_save_path($sessionPath);
-session_start();
+loadEnvFile(__DIR__ . '/.env');
 
-$pdo = new PDO($dsn);
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+$appConfig = getAppConfig(__DIR__, $storagePath, $sessionPath);
 
-$pdo->exec(
-    'CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        full_name TEXT NOT NULL,
-        username TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
-        role TEXT NOT NULL CHECK(role IN ("owner", "admin", "sales")),
-        is_active INTEGER NOT NULL DEFAULT 1,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-    )'
-);
+if (PHP_SAPI !== 'cli') {
+    session_save_path($appConfig['session_path']);
+    session_start();
+}
 
-$pdo->exec(
-    'CREATE TABLE IF NOT EXISTS nota_dropping (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        outlet_code TEXT NOT NULL,
-        outlet_name TEXT NOT NULL,
-        invoice_date TEXT NOT NULL,
-        invoice_value INTEGER NOT NULL,
-        payment_amount INTEGER NOT NULL DEFAULT 0,
-        sales_name TEXT NOT NULL,
-        payment_status TEXT NOT NULL CHECK(payment_status IN ("belum_bayar", "sudah_bayar")),
-        sender_name TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-    )'
-);
+$pdo = createDatabaseConnection($appConfig);
+initializeDatabase($pdo);
 
-$noteColumns = $pdo->query('PRAGMA table_info(nota_dropping)')->fetchAll();
-$noteColumnNames = array_column($noteColumns, 'name');
+function loadEnvFile(string $path): void
+{
+    if (!is_file($path)) {
+        return;
+    }
 
-if (!in_array('payment_amount', $noteColumnNames, true)) {
-    $pdo->exec('ALTER TABLE nota_dropping ADD COLUMN payment_amount INTEGER NOT NULL DEFAULT 0');
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        return;
+    }
+
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if ($trimmed === '' || str_starts_with($trimmed, '#') || !str_contains($trimmed, '=')) {
+            continue;
+        }
+
+        [$key, $value] = explode('=', $trimmed, 2);
+        $key = trim($key);
+        $value = trim($value);
+
+        if ($key === '') {
+            continue;
+        }
+
+        if (
+            (str_starts_with($value, '"') && str_ends_with($value, '"'))
+            || (str_starts_with($value, "'") && str_ends_with($value, "'"))
+        ) {
+            $value = substr($value, 1, -1);
+        }
+
+        putenv($key . '=' . $value);
+        $_ENV[$key] = $value;
+        $_SERVER[$key] = $value;
+    }
+}
+
+function envValue(string $key, ?string $default = null): ?string
+{
+    $value = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
+
+    if ($value === false || $value === null || $value === '') {
+        return $default;
+    }
+
+    return (string)$value;
+}
+
+function resolveProjectPath(string $projectRoot, string $path): string
+{
+    if ($path === '') {
+        return $projectRoot;
+    }
+
+    if (preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) === 1 || str_starts_with($path, '/') || str_starts_with($path, '\\\\')) {
+        return $path;
+    }
+
+    return rtrim($projectRoot, '/\\') . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
+}
+
+function getAppConfig(string $projectRoot, string $storagePath, string $sessionPath): array
+{
+    $connection = strtolower(envValue('DB_CONNECTION', 'sqlite') ?? 'sqlite');
+
+    $config = [
+        'project_root' => $projectRoot,
+        'storage_path' => $storagePath,
+        'session_path' => $sessionPath,
+        'db_connection' => $connection,
+        'sqlite_source_path' => resolveProjectPath($projectRoot, envValue('SQLITE_SOURCE_PATH', 'storage/database.sqlite') ?? 'storage/database.sqlite'),
+    ];
+
+    if ($connection === 'mysql' || $connection === 'mariadb') {
+        $config['db_connection'] = 'mysql';
+        $config['db_host'] = envValue('DB_HOST', '127.0.0.1') ?? '127.0.0.1';
+        $config['db_port'] = envValue('DB_PORT', '3306') ?? '3306';
+        $config['db_name'] = envValue('DB_DATABASE', '') ?? '';
+        $config['db_user'] = envValue('DB_USERNAME', '') ?? '';
+        $config['db_password'] = envValue('DB_PASSWORD', '') ?? '';
+        $config['db_charset'] = envValue('DB_CHARSET', 'utf8mb4') ?? 'utf8mb4';
+
+        return $config;
+    }
+
+    $config['db_connection'] = 'sqlite';
+    $config['db_path'] = resolveProjectPath($projectRoot, envValue('DB_DATABASE', 'storage/database.sqlite') ?? 'storage/database.sqlite');
+
+    return $config;
+}
+
+function createDatabaseConnection(array $config): PDO
+{
+    $options = [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ];
+
+    if ($config['db_connection'] === 'mysql') {
+        if (($config['db_name'] ?? '') === '' || ($config['db_user'] ?? '') === '') {
+            throw new RuntimeException('Konfigurasi MySQL belum lengkap. Isi DB_DATABASE, DB_USERNAME, dan DB_PASSWORD di file .env.');
+        }
+
+        $dsn = sprintf(
+            'mysql:host=%s;port=%s;dbname=%s;charset=%s',
+            $config['db_host'],
+            $config['db_port'],
+            $config['db_name'],
+            $config['db_charset']
+        );
+
+        return new PDO($dsn, $config['db_user'], $config['db_password'], $options);
+    }
+
+    $databaseDirectory = dirname($config['db_path']);
+    if (!is_dir($databaseDirectory)) {
+        mkdir($databaseDirectory, 0777, true);
+    }
+
+    $pdo = new PDO('sqlite:' . $config['db_path'], null, null, $options);
+    $pdo->exec('PRAGMA foreign_keys = ON');
+
+    return $pdo;
+}
+
+function initializeDatabase(PDO $pdo): void
+{
+    $driver = (string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+    createUsersTable($pdo, $driver);
+    createNotaDroppingTable($pdo, $driver);
+    synchronizeLegacyColumns($pdo, $driver);
+    normalizePaymentStatus($pdo);
+    seedDefaultOwner($pdo);
+}
+
+function createUsersTable(PDO $pdo, string $driver): void
+{
+    if ($driver === 'mysql') {
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS users (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                full_name VARCHAR(150) NOT NULL,
+                username VARCHAR(50) NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                role VARCHAR(20) NOT NULL,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                UNIQUE KEY uq_users_username (username),
+                KEY idx_users_role (role)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+
+        return;
+    }
+
     $pdo->exec(
-        'UPDATE nota_dropping
-        SET payment_amount = CASE
-            WHEN payment_status = "sudah_bayar" THEN invoice_value
-            ELSE 0
-        END'
+        "CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )"
     );
 }
 
-if (!in_array('archived_at', $noteColumnNames, true)) {
-    $pdo->exec('ALTER TABLE nota_dropping ADD COLUMN archived_at TEXT DEFAULT NULL');
+function createNotaDroppingTable(PDO $pdo, string $driver): void
+{
+    if ($driver === 'mysql') {
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS nota_dropping (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                outlet_code VARCHAR(50) NOT NULL,
+                outlet_name VARCHAR(180) NOT NULL,
+                invoice_date DATE NOT NULL,
+                invoice_value BIGINT UNSIGNED NOT NULL,
+                payment_amount BIGINT UNSIGNED NOT NULL DEFAULT 0,
+                sales_name VARCHAR(150) NOT NULL,
+                payment_status VARCHAR(20) NOT NULL,
+                sender_name VARCHAR(150) NOT NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                archived_at DATETIME NULL DEFAULT NULL,
+                created_by_user_id INT UNSIGNED NULL DEFAULT NULL,
+                updated_by_user_id INT UNSIGNED NULL DEFAULT NULL,
+                KEY idx_nota_invoice_date (invoice_date),
+                KEY idx_nota_archived_at (archived_at),
+                KEY idx_nota_created_by (created_by_user_id),
+                KEY idx_nota_updated_by (updated_by_user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+
+        return;
+    }
+
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS nota_dropping (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            outlet_code TEXT NOT NULL,
+            outlet_name TEXT NOT NULL,
+            invoice_date TEXT NOT NULL,
+            invoice_value INTEGER NOT NULL,
+            payment_amount INTEGER NOT NULL DEFAULT 0,
+            sales_name TEXT NOT NULL,
+            payment_status TEXT NOT NULL,
+            sender_name TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            archived_at TEXT DEFAULT NULL,
+            created_by_user_id INTEGER DEFAULT NULL,
+            updated_by_user_id INTEGER DEFAULT NULL
+        )"
+    );
 }
 
-if (!in_array('created_by_user_id', $noteColumnNames, true)) {
-    $pdo->exec('ALTER TABLE nota_dropping ADD COLUMN created_by_user_id INTEGER DEFAULT NULL');
+function synchronizeLegacyColumns(PDO $pdo, string $driver): void
+{
+    $noteColumns = getTableColumns($pdo, 'nota_dropping');
+
+    if (!in_array('payment_amount', $noteColumns, true)) {
+        $pdo->exec($driver === 'mysql'
+            ? 'ALTER TABLE nota_dropping ADD COLUMN payment_amount BIGINT UNSIGNED NOT NULL DEFAULT 0'
+            : 'ALTER TABLE nota_dropping ADD COLUMN payment_amount INTEGER NOT NULL DEFAULT 0');
+        $pdo->exec(
+            "UPDATE nota_dropping
+            SET payment_amount = CASE
+                WHEN payment_status = 'sudah_bayar' THEN invoice_value
+                ELSE 0
+            END"
+        );
+    }
+
+    if (!in_array('archived_at', $noteColumns, true)) {
+        $pdo->exec($driver === 'mysql'
+            ? 'ALTER TABLE nota_dropping ADD COLUMN archived_at DATETIME NULL DEFAULT NULL'
+            : 'ALTER TABLE nota_dropping ADD COLUMN archived_at TEXT DEFAULT NULL');
+    }
+
+    if (!in_array('created_by_user_id', $noteColumns, true)) {
+        $pdo->exec($driver === 'mysql'
+            ? 'ALTER TABLE nota_dropping ADD COLUMN created_by_user_id INT UNSIGNED NULL DEFAULT NULL'
+            : 'ALTER TABLE nota_dropping ADD COLUMN created_by_user_id INTEGER DEFAULT NULL');
+    }
+
+    if (!in_array('updated_by_user_id', $noteColumns, true)) {
+        $pdo->exec($driver === 'mysql'
+            ? 'ALTER TABLE nota_dropping ADD COLUMN updated_by_user_id INT UNSIGNED NULL DEFAULT NULL'
+            : 'ALTER TABLE nota_dropping ADD COLUMN updated_by_user_id INTEGER DEFAULT NULL');
+    }
 }
 
-if (!in_array('updated_by_user_id', $noteColumnNames, true)) {
-    $pdo->exec('ALTER TABLE nota_dropping ADD COLUMN updated_by_user_id INTEGER DEFAULT NULL');
+function getTableColumns(PDO $pdo, string $tableName): array
+{
+    $driver = (string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+    if ($driver === 'mysql') {
+        $statement = $pdo->query('SHOW COLUMNS FROM `' . $tableName . '`');
+        $columns = $statement->fetchAll();
+
+        return array_column($columns, 'Field');
+    }
+
+    $statement = $pdo->query('PRAGMA table_info(' . $tableName . ')');
+    $columns = $statement->fetchAll();
+
+    return array_column($columns, 'name');
 }
 
-$pdo->exec(
-    'UPDATE nota_dropping
-    SET payment_status = CASE
-        WHEN payment_amount >= invoice_value THEN "sudah_bayar"
-        ELSE "belum_bayar"
-    END
-    WHERE payment_status != CASE
-        WHEN payment_amount >= invoice_value THEN "sudah_bayar"
-        ELSE "belum_bayar"
-    END'
-);
+function normalizePaymentStatus(PDO $pdo): void
+{
+    $pdo->exec(
+        "UPDATE nota_dropping
+        SET payment_status = CASE
+            WHEN payment_amount >= invoice_value THEN 'sudah_bayar'
+            ELSE 'belum_bayar'
+        END
+        WHERE payment_status <> CASE
+            WHEN payment_amount >= invoice_value THEN 'sudah_bayar'
+            ELSE 'belum_bayar'
+        END"
+    );
+}
 
-$userCount = (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
-if ($userCount === 0) {
+function seedDefaultOwner(PDO $pdo): void
+{
+    $userCount = (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
+    if ($userCount > 0) {
+        return;
+    }
+
     $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');
     $statement = $pdo->prepare(
         'INSERT INTO users (full_name, username, password_hash, role, is_active, created_at, updated_at)
@@ -303,7 +534,7 @@ function getUserScopeWhere(array $user, string $tableAlias = ''): array
 
 function countActiveOwners(PDO $pdo, ?int $excludeUserId = null): int
 {
-    $sql = 'SELECT COUNT(*) FROM users WHERE role = "owner" AND is_active = 1';
+    $sql = "SELECT COUNT(*) FROM users WHERE role = 'owner' AND is_active = 1";
     $params = [];
     if ($excludeUserId !== null) {
         $sql .= ' AND id != :exclude_user_id';

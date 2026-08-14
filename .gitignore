@@ -1,3 +1,4 @@
+/.env
 /storage/database.sqlite
 /storage/sessions/
 /System.Drawing.Drawing2D.GraphicsPath
