@@ -4,6 +4,10 @@ declare(strict_types=1);
 require __DIR__ . '/bootstrap.php';
 
 $currentUser = requireLogin($pdo);
+if (!canManageUsers($currentUser)) {
+    setFlash('error', 'Halaman user hanya bisa dibuka oleh owner.');
+    redirectToIndex();
+}
 $canManageAllUsers = canManageUsers($currentUser);
 
 $errors = [];

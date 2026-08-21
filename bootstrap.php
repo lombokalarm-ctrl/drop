@@ -459,6 +459,11 @@ function formatCurrency(int $amount): string
     return 'Rp ' . number_format($amount, 0, ',', '.');
 }
 
+function formatNumberId(int $amount): string
+{
+    return number_format($amount, 0, ',', '.');
+}
+
 function calculatePaymentStatus(int $invoiceValue, int $paymentAmount): string
 {
     return $paymentAmount >= $invoiceValue ? 'sudah_bayar' : 'belum_bayar';
@@ -537,7 +542,7 @@ function roleLabel(string $role): string
 
 function canManageUsers(array $user): bool
 {
-    return in_array($user['role'], ['owner', 'staff'], true);
+    return $user['role'] === 'owner';
 }
 
 function canViewArchive(array $user): bool

@@ -89,13 +89,6 @@ $flash = getFlash();
                 </div>
             </form>
 
-            <div class="auth-note">
-                <strong>Akun awal otomatis:</strong>
-                <div>Username: <code>admin</code> | Password: <code>madani123</code></div>
-                <div>Username: <code>sales</code> | Password: <code>madani123</code></div>
-                <div>Username: <code>gudang</code> | Password: <code>madani123</code></div>
-                <p>Setelah login, masing-masing user bisa mengganti passwordnya dari halaman akun.</p>
-            </div>
         </section>
     </main>
 </body>

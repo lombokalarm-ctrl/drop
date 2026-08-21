@@ -435,7 +435,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                         <?= $isArchivePage ? 'Halaman Utama' : 'Halaman Arsip' ?>
                     </a>
                 <?php endif; ?>
-                <a class="badge badge-link" href="users.php"><?= canManageUsers($currentUser) ? 'Kelola User' : 'Akun Saya' ?></a>
+                <a class="badge badge-link" href="<?= canManageUsers($currentUser) ? 'users.php' : 'account.php' ?>"><?= canManageUsers($currentUser) ? 'Kelola User' : 'Akun Saya' ?></a>
                 <a class="badge badge-link" href="logout.php">Logout</a>
             </div>
             <div class="hero-actions">
@@ -451,11 +451,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             </article>
             <article class="card summary-card">
                 <span class="summary-label">Total Nilai Nota</span>
-                <strong><?= formatCurrency((int)($summary['total_nilai'] ?? 0)) ?></strong>
+                <strong><?= formatNumberId((int)($summary['total_nilai'] ?? 0)) ?></strong>
             </article>
             <article class="card summary-card success">
                 <span class="summary-label">Total Dibayar</span>
-                <strong><?= formatCurrency((int)($summary['total_dibayar'] ?? 0)) ?></strong>
+                <strong><?= formatNumberId((int)($summary['total_dibayar'] ?? 0)) ?></strong>
             </article>
             <article class="card summary-card warning">
                 <span class="summary-label">Masih Hutang</span>
@@ -463,7 +463,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             </article>
             <article class="card summary-card danger">
                 <span class="summary-label">Outstanding</span>
-                <strong><?= formatCurrency((int)($summary['total_piutang'] ?? 0)) ?></strong>
+                <strong><?= formatNumberId((int)($summary['total_piutang'] ?? 0)) ?></strong>
             </article>
         </section>
 
@@ -627,9 +627,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                         <?php if ($isArchivePage): ?>
                                             <td><?= formatDateTimeId($row['archived_at']) ?></td>
                                         <?php endif; ?>
-                                        <td><?= formatCurrency((int)$row['invoice_value']) ?></td>
-                                        <td><?= formatCurrency((int)$row['payment_amount']) ?></td>
-                                        <td><?= formatCurrency($remainingAmount) ?></td>
+                                        <td><?= formatNumberId((int)$row['invoice_value']) ?></td>
+                                        <td><?= formatNumberId((int)$row['payment_amount']) ?></td>
+                                        <td><?= formatNumberId($remainingAmount) ?></td>
                                         <td><?= htmlspecialchars($row['sales_name'], ENT_QUOTES, 'UTF-8') ?></td>
                                         <td><?= htmlspecialchars($row['sender_name'] !== '' ? $row['sender_name'] : '-', ENT_QUOTES, 'UTF-8') ?></td>
                                         <td>
