@@ -388,7 +388,9 @@ function formatDateId(?string $date): string
         return '-';
     }
 
-    $dateTime = DateTime::createFromFormat('Y-m-d', $date);
+    $normalized = trim($date);
+    $dateOnly = explode(' ', $normalized)[0];
+    $dateTime = DateTime::createFromFormat('Y-m-d', $dateOnly);
 
     return $dateTime ? $dateTime->format('d-m-Y') : $date;
 }

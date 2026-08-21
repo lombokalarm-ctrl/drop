@@ -522,6 +522,17 @@ tbody td small {
 
 .table-wrap .action-group {
     flex-wrap: nowrap;
+    align-items: center;
+}
+
+.table-wrap .action-group form {
+    display: inline-flex;
+    margin: 0;
+}
+
+.table-wrap .action-group .btn,
+.table-wrap .action-group form .btn {
+    white-space: nowrap;
 }
 
 .status-pill.belum_bayar {
