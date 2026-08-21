@@ -29,6 +29,7 @@ body {
     color: var(--text);
     font-size: 14px;
     line-height: 1.5;
+    overflow-x: hidden;
 }
 
 body.modal-open {
@@ -55,6 +56,7 @@ select {
     max-width: 1380px;
     margin: 0 auto;
     padding: 16px;
+    min-width: 0;
 }
 
 .card {
@@ -70,6 +72,7 @@ select {
     gap: 16px;
     padding: 18px;
     margin-bottom: 14px;
+    min-width: 0;
 }
 
 .eyebrow {
@@ -159,11 +162,13 @@ select {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     margin-bottom: 14px;
+    min-width: 0;
 }
 
 .summary-card {
     padding: 12px 14px;
     min-height: 84px;
+    min-width: 0;
 }
 
 .summary-card strong {
@@ -220,11 +225,17 @@ select {
     grid-template-columns: 460px minmax(0, 1fr);
     gap: 14px;
     align-items: start;
+    min-width: 0;
 }
 
 .form-card,
 .table-card {
     padding: 16px;
+    min-width: 0;
+}
+
+.table-card {
+    overflow: hidden;
 }
 
 .section-head {
@@ -462,15 +473,19 @@ select {
 }
 
 .table-wrap {
-    overflow: auto;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
     border: 1px solid var(--line);
     border-radius: 12px;
+    -webkit-overflow-scrolling: touch;
 }
 
 table {
-    width: 100%;
+    width: max(100%, 1080px);
     border-collapse: collapse;
-    min-width: 1080px;
+    min-width: 0;
 }
 
 thead th {
@@ -558,13 +573,21 @@ tbody td small {
     }
 
     .form-card .field-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .form-card .field-grid label {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        align-items: center;
         gap: 8px;
     }
 
     .form-card .field-grid span {
-        margin-bottom: 4px;
+        margin-bottom: 0;
         font-size: 11px;
+        line-height: 1.2;
     }
 
     .form-card .field-grid input,
@@ -590,6 +613,18 @@ tbody td small {
         width: 100%;
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .table-card {
+        width: 100%;
+    }
+
+    .table-wrap {
+        width: 100%;
+    }
+
+    table {
+        width: max(100%, 880px);
     }
 
     .summary-card {
@@ -623,10 +658,19 @@ tbody td small {
         gap: 7px;
     }
 
+    .form-card .field-grid label {
+        grid-template-columns: 84px minmax(0, 1fr);
+        gap: 7px;
+    }
+
     .form-card .field-grid input,
     .form-card .field-grid select {
         padding: 8px 9px;
         font-size: 12px;
+    }
+
+    table {
+        width: max(100%, 760px);
     }
 }
 
