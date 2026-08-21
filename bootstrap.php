@@ -158,8 +158,9 @@ function initializeDatabase(PDO $pdo): void
     createUsersTable($pdo, $driver);
     createNotaDroppingTable($pdo, $driver);
     synchronizeLegacyColumns($pdo, $driver);
+    normalizeUserRoles($pdo);
     normalizePaymentStatus($pdo);
-    seedDefaultOwner($pdo);
+    seedDefaultUsers($pdo);
 }
 
 function createUsersTable(PDO $pdo, string $driver): void
@@ -323,26 +324,53 @@ function normalizePaymentStatus(PDO $pdo): void
     );
 }
 
-function seedDefaultOwner(PDO $pdo): void
+function normalizeUserRoles(PDO $pdo): void
 {
-    $userCount = (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
-    if ($userCount > 0) {
-        return;
-    }
+    $pdo->exec("UPDATE users SET role = 'staff' WHERE role = 'admin'");
+}
 
+function seedDefaultUsers(PDO $pdo): void
+{
     $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');
-    $statement = $pdo->prepare(
+    $defaultUsers = [
+        [
+            'full_name' => 'Staff Admin',
+            'username' => 'admin',
+            'role' => 'staff',
+        ],
+        [
+            'full_name' => 'Sales',
+            'username' => 'sales',
+            'role' => 'sales',
+        ],
+        [
+            'full_name' => 'Gudang',
+            'username' => 'gudang',
+            'role' => 'gudang',
+        ],
+    ];
+
+    $findStatement = $pdo->prepare('SELECT id FROM users WHERE username = :username LIMIT 1');
+    $insertStatement = $pdo->prepare(
         'INSERT INTO users (full_name, username, password_hash, role, is_active, created_at, updated_at)
         VALUES (:full_name, :username, :password_hash, :role, 1, :created_at, :updated_at)'
     );
-    $statement->execute([
-        'full_name' => 'Owner',
-        'username' => 'owner',
-        'password_hash' => password_hash('owner123', PASSWORD_DEFAULT),
-        'role' => 'owner',
-        'created_at' => $now,
-        'updated_at' => $now,
-    ]);
+
+    foreach ($defaultUsers as $user) {
+        $findStatement->execute(['username' => $user['username']]);
+        if ($findStatement->fetch()) {
+            continue;
+        }
+
+        $insertStatement->execute([
+            'full_name' => $user['full_name'],
+            'username' => $user['username'],
+            'password_hash' => password_hash('madani123', PASSWORD_DEFAULT),
+            'role' => $user['role'],
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
 }
 
 function redirectTo(string $path, array $params = []): never
@@ -500,20 +528,21 @@ function roleLabel(string $role): string
 {
     return match ($role) {
         'owner' => 'Owner',
-        'admin' => 'Admin',
+        'admin', 'staff' => 'Staff',
         'sales' => 'Sales',
+        'gudang' => 'Gudang',
         default => ucfirst($role),
     };
 }
 
 function canManageUsers(array $user): bool
 {
-    return $user['role'] === 'owner';
+    return in_array($user['role'], ['owner', 'staff'], true);
 }
 
 function canViewArchive(array $user): bool
 {
-    return in_array($user['role'], ['owner', 'admin'], true);
+    return in_array($user['role'], ['owner', 'staff'], true);
 }
 
 function canDeletePermanent(array $user): bool
@@ -523,7 +552,7 @@ function canDeletePermanent(array $user): bool
 
 function canArchiveNote(array $user, array $note): bool
 {
-    if (in_array($user['role'], ['owner', 'admin'], true)) {
+    if (in_array($user['role'], ['owner', 'staff'], true)) {
         return true;
     }
 
@@ -532,7 +561,7 @@ function canArchiveNote(array $user, array $note): bool
 
 function canEditNote(array $user, array $note): bool
 {
-    if (in_array($user['role'], ['owner', 'admin'], true)) {
+    if (in_array($user['role'], ['owner', 'staff'], true)) {
         return true;
     }
 
@@ -541,16 +570,16 @@ function canEditNote(array $user, array $note): bool
 
 function canPayNote(array $user, array $note): bool
 {
-    if (in_array($user['role'], ['owner', 'admin'], true)) {
+    if (in_array($user['role'], ['owner', 'staff'], true)) {
         return true;
     }
 
-    return $user['role'] === 'sales' && (int)($note['created_by_user_id'] ?? 0) === (int)$user['id'];
+    return false;
 }
 
 function canManageSender(array $user, array $note): bool
 {
-    if (in_array($user['role'], ['owner', 'admin'], true)) {
+    if (in_array($user['role'], ['owner', 'staff', 'gudang'], true)) {
         return true;
     }
 
@@ -559,7 +588,7 @@ function canManageSender(array $user, array $note): bool
 
 function canCreateNote(array $user): bool
 {
-    return in_array($user['role'], ['owner', 'admin', 'sales'], true);
+    return in_array($user['role'], ['owner', 'staff', 'sales'], true);
 }
 
 function getUserScopeWhere(array $user, string $tableAlias = ''): array

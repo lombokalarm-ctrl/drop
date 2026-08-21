@@ -52,7 +52,7 @@ $flash = getFlash();
         <section class="card auth-card">
             <p class="eyebrow">Akses Aplikasi</p>
             <h1>Login Nota Dropping</h1>
-            <p class="hero-text">Masuk dengan akun user untuk mengatur akses owner, admin, dan sales.</p>
+            <p class="hero-text">Masuk dengan akun staff, sales, atau gudang sesuai tugas masing-masing.</p>
 
             <?php if ($flash): ?>
                 <div class="flash <?= htmlspecialchars($flash['type'], ENT_QUOTES, 'UTF-8') ?>">
@@ -91,9 +91,10 @@ $flash = getFlash();
 
             <div class="auth-note">
                 <strong>Akun awal otomatis:</strong>
-                <div>Username: <code>owner</code></div>
-                <div>Password: <code>owner123</code></div>
-                <p>Setelah login, owner bisa menambah user baru dan mengganti password dari halaman kelola user.</p>
+                <div>Username: <code>admin</code> | Password: <code>madani123</code></div>
+                <div>Username: <code>sales</code> | Password: <code>madani123</code></div>
+                <div>Username: <code>gudang</code> | Password: <code>madani123</code></div>
+                <p>Setelah login, masing-masing user bisa mengganti passwordnya dari halaman akun.</p>
             </div>
         </section>
     </main>

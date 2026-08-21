@@ -435,9 +435,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                         <?= $isArchivePage ? 'Halaman Utama' : 'Halaman Arsip' ?>
                     </a>
                 <?php endif; ?>
-                <?php if (canManageUsers($currentUser)): ?>
-                    <a class="badge badge-link" href="users.php">Kelola User</a>
-                <?php endif; ?>
+                <a class="badge badge-link" href="users.php"><?= canManageUsers($currentUser) ? 'Kelola User' : 'Akun Saya' ?></a>
                 <a class="badge badge-link" href="logout.php">Logout</a>
             </div>
             <div class="hero-actions">
@@ -515,6 +513,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                         <p>Data yang diarsipkan tidak tampil lagi di halaman utama.</p>
                         <p>Gunakan tombol <strong>Hapus Permanen</strong> hanya untuk data yang benar-benar sudah tidak dibutuhkan.</p>
                         <a class="btn btn-secondary" href="index.php">Kembali ke Halaman Utama</a>
+                    </div>
+                <?php elseif (!canCreateNote($currentUser)): ?>
+                    <div class="archive-panel">
+                        <p>Role Anda difokuskan untuk operasional gudang.</p>
+                        <p>Gunakan tombol <strong>Input Pengirim</strong> atau <strong>Edit Pengirim</strong> di daftar nota untuk mengisi data pengirim.</p>
                     </div>
                 <?php else: ?>
                     <form method="post" class="nota-form">

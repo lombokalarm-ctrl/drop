@@ -4,13 +4,10 @@ declare(strict_types=1);
 require __DIR__ . '/bootstrap.php';
 
 $currentUser = requireLogin($pdo);
-if (!canManageUsers($currentUser)) {
-    setFlash('error', 'Hanya owner yang bisa mengelola user.');
-    redirectToIndex();
-}
+$canManageAllUsers = canManageUsers($currentUser);
 
 $errors = [];
-$editId = isset($_GET['edit']) ? (int)$_GET['edit'] : 0;
+$editId = $canManageAllUsers ? (isset($_GET['edit']) ? (int)$_GET['edit'] : 0) : 0;
 $editUser = $editId > 0 ? findUser($pdo, $editId) : null;
 
 if ($editId > 0 && !$editUser) {
@@ -21,17 +18,75 @@ if ($editId > 0 && !$editUser) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string)($_POST['action'] ?? 'save_user');
 
+    if ($action === 'change_password') {
+        $id = (int)($_POST['id'] ?? 0);
+        $targetUser = $id > 0 ? findUser($pdo, $id) : null;
+        $currentPassword = (string)($_POST['current_password'] ?? '');
+        $newPassword = (string)($_POST['new_password'] ?? '');
+        $confirmPassword = (string)($_POST['confirm_password'] ?? '');
+
+        if (!$targetUser || (int)$targetUser['id'] !== (int)$currentUser['id']) {
+            setFlash('error', 'User untuk ganti password tidak valid.');
+            redirectTo('users.php');
+        }
+
+        if ($currentPassword === '') {
+            $errors[] = 'Password saat ini wajib diisi.';
+        } elseif (!password_verify($currentPassword, (string)$targetUser['password_hash'])) {
+            $errors[] = 'Password saat ini tidak sesuai.';
+        }
+
+        if ($newPassword === '') {
+            $errors[] = 'Password baru wajib diisi.';
+        } elseif (strlen($newPassword) < 8) {
+            $errors[] = 'Password baru minimal 8 karakter.';
+        }
+
+        if ($confirmPassword === '') {
+            $errors[] = 'Konfirmasi password wajib diisi.';
+        } elseif ($newPassword !== $confirmPassword) {
+            $errors[] = 'Konfirmasi password tidak sama.';
+        }
+
+        if ($errors === []) {
+            $statement = $pdo->prepare(
+                'UPDATE users
+                SET password_hash = :password_hash,
+                    updated_at = :updated_at
+                WHERE id = :id'
+            );
+            $statement->execute([
+                'id' => (int)$targetUser['id'],
+                'password_hash' => password_hash($newPassword, PASSWORD_DEFAULT),
+                'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+            ]);
+
+            setFlash('success', 'Password berhasil diganti.');
+            redirectTo('users.php');
+        }
+    }
+
     if ($action === 'toggle_user') {
+        if (!$canManageAllUsers) {
+            setFlash('error', 'Anda tidak memiliki izin untuk mengubah status user.');
+            redirectTo('users.php');
+        }
+
         $id = (int)($_POST['id'] ?? 0);
         $targetUser = $id > 0 ? findUser($pdo, $id) : null;
 
         if (!$targetUser) {
             setFlash('error', 'User yang ingin diubah statusnya tidak ditemukan.');
         } else {
+            if ($targetUser['role'] === 'owner' && $currentUser['role'] !== 'owner') {
+                setFlash('error', 'Hanya owner yang bisa mengubah status akun owner.');
+                redirectTo('users.php');
+            }
+
             $nextStatus = (int)$targetUser['is_active'] === 1 ? 0 : 1;
 
             if ((int)$targetUser['id'] === (int)$currentUser['id'] && $nextStatus === 0) {
-                setFlash('error', 'Owner yang sedang login tidak bisa menonaktifkan akunnya sendiri.');
+                setFlash('error', 'User yang sedang login tidak bisa menonaktifkan akunnya sendiri.');
                 redirectTo('users.php');
             }
 
@@ -58,96 +113,112 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectTo('users.php');
     }
 
-    if ($action !== 'save_user') {
+    if (!in_array($action, ['save_user', 'change_password'], true)) {
         setFlash('error', 'Aksi user tidak dikenali.');
         redirectTo('users.php');
     }
 
-    $id = (int)($_POST['id'] ?? 0);
-    $existingUser = $id > 0 ? findUser($pdo, $id) : null;
-    $fullName = trim((string)($_POST['full_name'] ?? ''));
-    $username = strtolower(trim((string)($_POST['username'] ?? '')));
-    $role = (string)($_POST['role'] ?? 'sales');
-    $password = (string)($_POST['password'] ?? '');
-
-    if ($fullName === '') {
-        $errors[] = 'Nama lengkap wajib diisi.';
-    }
-
-    if ($username === '') {
-        $errors[] = 'Username wajib diisi.';
-    } elseif (!preg_match('/^[a-z0-9._-]{3,30}$/', $username)) {
-        $errors[] = 'Username hanya boleh berisi huruf kecil, angka, titik, garis bawah, atau tanda minus.';
-    }
-
-    if (!in_array($role, ['owner', 'admin', 'sales'], true)) {
-        $errors[] = 'Role user tidak valid.';
-    }
-
-    if ($id === 0 && $password === '') {
-        $errors[] = 'Password wajib diisi untuk user baru.';
-    }
-
-    if ($id > 0 && !$existingUser) {
-        $errors[] = 'User yang ingin diperbarui tidak ditemukan.';
-    }
-
-    $duplicateStatement = $pdo->prepare('SELECT id FROM users WHERE username = :username AND id != :id LIMIT 1');
-    $duplicateStatement->execute([
-        'username' => $username,
-        'id' => $id,
-    ]);
-    if ($duplicateStatement->fetch()) {
-        $errors[] = 'Username sudah dipakai user lain.';
-    }
-
-    if ($existingUser && $existingUser['role'] === 'owner' && $role !== 'owner' && countActiveOwners($pdo, (int)$existingUser['id']) === 0) {
-        $errors[] = 'Role owner terakhir tidak bisa diubah sebelum ada owner aktif lain.';
-    }
-
-    if ($errors === []) {
-        $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');
-
-        if ($id > 0) {
-            $sql = 'UPDATE users
-                SET full_name = :full_name,
-                    username = :username,
-                    role = :role,
-                    updated_at = :updated_at';
-            $params = [
-                'id' => $id,
-                'full_name' => $fullName,
-                'username' => $username,
-                'role' => $role,
-                'updated_at' => $now,
-            ];
-
-            if ($password !== '') {
-                $sql .= ', password_hash = :password_hash';
-                $params['password_hash'] = password_hash($password, PASSWORD_DEFAULT);
-            }
-
-            $sql .= ' WHERE id = :id';
-            $statement = $pdo->prepare($sql);
-            $statement->execute($params);
-            setFlash('success', 'Data user berhasil diperbarui.');
-        } else {
-            $statement = $pdo->prepare(
-                'INSERT INTO users (full_name, username, password_hash, role, is_active, created_at, updated_at)
-                VALUES (:full_name, :username, :password_hash, :role, 1, :created_at, :updated_at)'
-            );
-            $statement->execute([
-                'full_name' => $fullName,
-                'username' => $username,
-                'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-                'role' => $role,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-            setFlash('success', 'User baru berhasil ditambahkan.');
+    if ($action === 'save_user') {
+        if (!$canManageAllUsers) {
+            setFlash('error', 'Anda tidak memiliki izin untuk mengelola user.');
+            redirectTo('users.php');
         }
 
-        redirectTo('users.php');
+        $id = (int)($_POST['id'] ?? 0);
+        $existingUser = $id > 0 ? findUser($pdo, $id) : null;
+        $fullName = trim((string)($_POST['full_name'] ?? ''));
+        $username = strtolower(trim((string)($_POST['username'] ?? '')));
+        $role = (string)($_POST['role'] ?? 'staff');
+        $password = (string)($_POST['password'] ?? '');
+
+        if ($existingUser && $existingUser['role'] === 'owner' && $currentUser['role'] !== 'owner') {
+            $errors[] = 'Hanya owner yang bisa mengubah akun owner.';
+        }
+
+        if ($fullName === '') {
+            $errors[] = 'Nama lengkap wajib diisi.';
+        }
+
+        if ($username === '') {
+            $errors[] = 'Username wajib diisi.';
+        } elseif (!preg_match('/^[a-z0-9._-]{3,30}$/', $username)) {
+            $errors[] = 'Username hanya boleh berisi huruf kecil, angka, titik, garis bawah, atau tanda minus.';
+        }
+
+        $allowedRoles = ['staff', 'sales', 'gudang'];
+        if ($currentUser['role'] === 'owner' || ($existingUser && $existingUser['role'] === 'owner')) {
+            $allowedRoles[] = 'owner';
+        }
+
+        if (!in_array($role, $allowedRoles, true)) {
+            $errors[] = 'Role user tidak valid.';
+        }
+
+        if ($id === 0 && $password === '') {
+            $errors[] = 'Password wajib diisi untuk user baru.';
+        }
+
+        if ($id > 0 && !$existingUser) {
+            $errors[] = 'User yang ingin diperbarui tidak ditemukan.';
+        }
+
+        $duplicateStatement = $pdo->prepare('SELECT id FROM users WHERE username = :username AND id != :id LIMIT 1');
+        $duplicateStatement->execute([
+            'username' => $username,
+            'id' => $id,
+        ]);
+        if ($duplicateStatement->fetch()) {
+            $errors[] = 'Username sudah dipakai user lain.';
+        }
+
+        if ($existingUser && $existingUser['role'] === 'owner' && $role !== 'owner' && countActiveOwners($pdo, (int)$existingUser['id']) === 0) {
+            $errors[] = 'Role owner terakhir tidak bisa diubah sebelum ada owner aktif lain.';
+        }
+
+        if ($errors === []) {
+            $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');
+
+            if ($id > 0) {
+                $sql = 'UPDATE users
+                    SET full_name = :full_name,
+                        username = :username,
+                        role = :role,
+                        updated_at = :updated_at';
+                $params = [
+                    'id' => $id,
+                    'full_name' => $fullName,
+                    'username' => $username,
+                    'role' => $role,
+                    'updated_at' => $now,
+                ];
+
+                if ($password !== '') {
+                    $sql .= ', password_hash = :password_hash';
+                    $params['password_hash'] = password_hash($password, PASSWORD_DEFAULT);
+                }
+
+                $sql .= ' WHERE id = :id';
+                $statement = $pdo->prepare($sql);
+                $statement->execute($params);
+                setFlash('success', 'Data user berhasil diperbarui.');
+            } else {
+                $statement = $pdo->prepare(
+                    'INSERT INTO users (full_name, username, password_hash, role, is_active, created_at, updated_at)
+                    VALUES (:full_name, :username, :password_hash, :role, 1, :created_at, :updated_at)'
+                );
+                $statement->execute([
+                    'full_name' => $fullName,
+                    'username' => $username,
+                    'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+                    'role' => $role,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+                setFlash('success', 'User baru berhasil ditambahkan.');
+            }
+
+            redirectTo('users.php');
+        }
     }
 }
 
@@ -156,19 +227,22 @@ $statement = $pdo->query(
         COUNT(*) AS total_user,
         SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS total_aktif,
         SUM(CASE WHEN role = 'owner' THEN 1 ELSE 0 END) AS total_owner,
-        SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS total_admin,
-        SUM(CASE WHEN role = 'sales' THEN 1 ELSE 0 END) AS total_sales
+        SUM(CASE WHEN role = 'staff' THEN 1 ELSE 0 END) AS total_staff,
+        SUM(CASE WHEN role = 'sales' THEN 1 ELSE 0 END) AS total_sales,
+        SUM(CASE WHEN role = 'gudang' THEN 1 ELSE 0 END) AS total_gudang
     FROM users"
 );
 $summary = $statement->fetch() ?: [];
 
-$users = $pdo->query('SELECT * FROM users ORDER BY role ASC, full_name ASC, id ASC')->fetchAll();
+$users = $canManageAllUsers
+    ? $pdo->query('SELECT * FROM users ORDER BY role ASC, full_name ASC, id ASC')->fetchAll()
+    : [$currentUser];
 $flash = getFlash();
 $formData = $editUser ?? [
     'id' => 0,
     'full_name' => '',
     'username' => '',
-    'role' => 'sales',
+    'role' => 'staff',
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [] && (string)($_POST['action'] ?? '') === 'save_user') {
@@ -176,7 +250,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [] && (string)($_POST['
         'id' => (int)($_POST['id'] ?? 0),
         'full_name' => (string)($_POST['full_name'] ?? ''),
         'username' => (string)($_POST['username'] ?? ''),
-        'role' => (string)($_POST['role'] ?? 'sales'),
+        'role' => (string)($_POST['role'] ?? 'staff'),
     ];
 }
 ?>
@@ -193,8 +267,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [] && (string)($_POST['
         <section class="hero card">
             <div>
                 <p class="eyebrow">Manajemen Akses</p>
-                <h1>Kelola User Login</h1>
-                <p class="hero-text">Atur akun dan permission dasar untuk role owner, admin, dan sales.</p>
+                <h1><?= $canManageAllUsers ? 'Kelola User Login' : 'Akun Saya' ?></h1>
+                <p class="hero-text">
+                    <?= $canManageAllUsers
+                        ? 'Atur akun untuk staff, sales, dan gudang sekaligus jaga akses tiap role tetap sesuai tugasnya.'
+                        : 'Ganti password akun Anda sendiri agar akses tetap aman.' ?>
+                </p>
             </div>
             <div class="hero-badges">
                 <span class="badge badge-neutral"><?= htmlspecialchars($currentUser['full_name'], ENT_QUOTES, 'UTF-8') ?></span>
@@ -218,12 +296,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [] && (string)($_POST['
                 <strong><?= (int)($summary['total_owner'] ?? 0) ?></strong>
             </article>
             <article class="card summary-card">
-                <span class="summary-label">Admin</span>
-                <strong><?= (int)($summary['total_admin'] ?? 0) ?></strong>
+                <span class="summary-label">Staff</span>
+                <strong><?= (int)($summary['total_staff'] ?? 0) ?></strong>
             </article>
             <article class="card summary-card">
                 <span class="summary-label">Sales</span>
                 <strong><?= (int)($summary['total_sales'] ?? 0) ?></strong>
+            </article>
+            <article class="card summary-card">
+                <span class="summary-label">Gudang</span>
+                <strong><?= (int)($summary['total_gudang'] ?? 0) ?></strong>
             </article>
         </section>
 
@@ -235,7 +317,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [] && (string)($_POST['
 
         <?php if ($errors !== []): ?>
             <div class="flash error">
-                <strong>Data user belum bisa disimpan:</strong>
+                <strong><?= (string)($_POST['action'] ?? '') === 'change_password' ? 'Password belum bisa diganti:' : 'Data user belum bisa disimpan:' ?></strong>
                 <ul>
                     <?php foreach ($errors as $error): ?>
                         <li><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></li>
@@ -247,62 +329,101 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [] && (string)($_POST['
         <div class="layout">
             <section class="card form-card">
                 <div class="section-head">
-                    <h2><?= (int)$formData['id'] > 0 ? 'Edit User' : 'Tambah User Baru' ?></h2>
-                    <?php if ((int)$formData['id'] > 0): ?>
+                    <h2><?= $canManageAllUsers ? ((int)$formData['id'] > 0 ? 'Edit User' : 'Tambah User Baru') : 'Ganti Password Saya' ?></h2>
+                    <?php if ($canManageAllUsers && (int)$formData['id'] > 0): ?>
                         <a class="text-link" href="users.php">Batal edit</a>
                     <?php endif; ?>
                 </div>
 
-                <form method="post" class="nota-form">
-                    <input type="hidden" name="action" value="save_user">
-                    <input type="hidden" name="id" value="<?= (int)$formData['id'] ?>">
+                <?php if ($canManageAllUsers): ?>
+                    <form method="post" class="nota-form">
+                        <input type="hidden" name="action" value="save_user">
+                        <input type="hidden" name="id" value="<?= (int)$formData['id'] ?>">
 
-                    <div class="field-grid">
-                        <label>
-                            <span>Nama Lengkap</span>
-                            <input type="text" name="full_name" value="<?= htmlspecialchars((string)$formData['full_name'], ENT_QUOTES, 'UTF-8') ?>" required>
-                        </label>
+                        <div class="field-grid">
+                            <label>
+                                <span>Nama Lengkap</span>
+                                <input type="text" name="full_name" value="<?= htmlspecialchars((string)$formData['full_name'], ENT_QUOTES, 'UTF-8') ?>" required>
+                            </label>
 
-                        <label>
-                            <span>Username</span>
-                            <input type="text" name="username" value="<?= htmlspecialchars((string)$formData['username'], ENT_QUOTES, 'UTF-8') ?>" placeholder="contoh: sales.timur" required>
-                        </label>
+                            <label>
+                                <span>Username</span>
+                                <input type="text" name="username" value="<?= htmlspecialchars((string)$formData['username'], ENT_QUOTES, 'UTF-8') ?>" placeholder="contoh: sales.timur" required>
+                            </label>
 
-                        <label>
-                            <span>Role</span>
-                            <select name="role" required>
-                                <option value="owner" <?= (string)$formData['role'] === 'owner' ? 'selected' : '' ?>>Owner</option>
-                                <option value="admin" <?= (string)$formData['role'] === 'admin' ? 'selected' : '' ?>>Admin</option>
-                                <option value="sales" <?= (string)$formData['role'] === 'sales' ? 'selected' : '' ?>>Sales</option>
-                            </select>
-                        </label>
+                            <label>
+                                <span>Role</span>
+                                <select name="role" required>
+                                    <?php if ((string)$formData['role'] === 'owner' && $currentUser['role'] === 'owner'): ?>
+                                        <option value="owner" selected>Owner</option>
+                                    <?php endif; ?>
+                                    <option value="staff" <?= (string)$formData['role'] === 'staff' ? 'selected' : '' ?>>Staff</option>
+                                    <option value="sales" <?= (string)$formData['role'] === 'sales' ? 'selected' : '' ?>>Sales</option>
+                                    <option value="gudang" <?= (string)$formData['role'] === 'gudang' ? 'selected' : '' ?>>Gudang</option>
+                                </select>
+                            </label>
 
-                        <label>
-                            <span>Password <?= (int)$formData['id'] > 0 ? '(kosongkan jika tidak diubah)' : '' ?></span>
-                            <input type="password" name="password" <?= (int)$formData['id'] > 0 ? '' : 'required' ?>>
-                        </label>
+                            <label>
+                                <span>Password <?= (int)$formData['id'] > 0 ? '(kosongkan jika tidak diubah)' : '' ?></span>
+                                <input type="password" name="password" <?= (int)$formData['id'] > 0 ? '' : 'required' ?>>
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary"><?= (int)$formData['id'] > 0 ? 'Simpan User' : 'Tambah User' ?></button>
+                            <a class="btn btn-secondary" href="users.php">Reset</a>
+                        </div>
+                    </form>
+
+                    <div class="auth-note">
+                        <strong>Role saat ini:</strong>
+                        <ul>
+                            <li><strong>Staff</strong>: kelola user, input nota, edit nota, lihat arsip, dan input pembayaran.</li>
+                            <li><strong>Sales</strong>: input dan edit nota yang dia buat sendiri.</li>
+                            <li><strong>Gudang</strong>: fokus mengisi data pengirim dari daftar nota.</li>
+                        </ul>
                     </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary"><?= (int)$formData['id'] > 0 ? 'Simpan User' : 'Tambah User' ?></button>
-                        <a class="btn btn-secondary" href="users.php">Reset</a>
-                    </div>
-                </form>
+                <?php endif; ?>
 
                 <div class="auth-note">
-                    <strong>Role saat ini:</strong>
-                    <ul>
-                        <li><strong>Owner</strong>: akses penuh termasuk kelola user dan hapus permanen arsip.</li>
-                        <li><strong>Admin</strong>: kelola nota dan lihat arsip, tanpa kelola user.</li>
-                        <li><strong>Sales</strong>: input, edit, bayar, dan arsip untuk nota yang dia buat sendiri.</li>
-                    </ul>
+                    <strong>Ganti password akun ini:</strong>
+                    <form method="post" class="nota-form" style="margin-top: 12px;">
+                        <input type="hidden" name="action" value="change_password">
+                        <input type="hidden" name="id" value="<?= (int)$currentUser['id'] ?>">
+
+                        <div class="field-grid">
+                            <label>
+                                <span>Username</span>
+                                <input type="text" value="<?= htmlspecialchars((string)$currentUser['username'], ENT_QUOTES, 'UTF-8') ?>" readonly>
+                            </label>
+
+                            <label>
+                                <span>Password Saat Ini</span>
+                                <input type="password" name="current_password" required>
+                            </label>
+
+                            <label>
+                                <span>Password Baru</span>
+                                <input type="password" name="new_password" required>
+                            </label>
+
+                            <label>
+                                <span>Konfirmasi Password</span>
+                                <input type="password" name="confirm_password" required>
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Ganti Password</button>
+                        </div>
+                    </form>
                 </div>
             </section>
 
             <section class="card table-card">
                 <div class="section-head">
                     <div class="table-head-main">
-                        <h2>Daftar User</h2>
+                        <h2><?= $canManageAllUsers ? 'Daftar User' : 'Akun Login' ?></h2>
                         <span class="table-count"><?= count($users) ?> user</span>
                     </div>
                 </div>
@@ -333,14 +454,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [] && (string)($_POST['
                                     <td><?= formatDateTimeId((string)$user['created_at']) ?></td>
                                     <td>
                                         <div class="action-group">
-                                            <a class="btn btn-small btn-secondary" href="users.php?edit=<?= (int)$user['id'] ?>">Edit</a>
-                                            <form method="post" onsubmit="return confirm('Ubah status user ini?');">
-                                                <input type="hidden" name="action" value="toggle_user">
-                                                <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
-                                                <button type="submit" class="btn btn-small <?= (int)$user['is_active'] === 1 ? 'btn-warning' : 'btn-primary' ?>">
-                                                    <?= (int)$user['is_active'] === 1 ? 'Nonaktifkan' : 'Aktifkan' ?>
-                                                </button>
-                                            </form>
+                                            <?php if ($canManageAllUsers): ?>
+                                                <a class="btn btn-small btn-secondary" href="users.php?edit=<?= (int)$user['id'] ?>">Edit</a>
+                                                <form method="post" onsubmit="return confirm('Ubah status user ini?');">
+                                                    <input type="hidden" name="action" value="toggle_user">
+                                                    <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
+                                                    <button type="submit" class="btn btn-small <?= (int)$user['is_active'] === 1 ? 'btn-warning' : 'btn-primary' ?>">
+                                                        <?= (int)$user['is_active'] === 1 ? 'Nonaktifkan' : 'Aktifkan' ?>
+                                                    </button>
+                                                </form>
+                                            <?php endif; ?>
+                                            <?php if ((int)$user['id'] === (int)$currentUser['id']): ?>
+                                                <span class="btn btn-small btn-disabled">Password Saya</span>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>
