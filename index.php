@@ -516,8 +516,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                     </div>
                 <?php elseif (!canCreateNote($currentUser)): ?>
                     <div class="archive-panel">
-                        <p>Role Anda difokuskan untuk operasional gudang.</p>
-                        <p>Gunakan tombol <strong>Input Pengirim</strong> atau <strong>Edit Pengirim</strong> di daftar nota untuk mengisi data pengirim.</p>
+                        <?php if ($currentUser['role'] === 'staff'): ?>
+                            <p>Role Anda difokuskan untuk proses pembayaran dan pengarsipan nota.</p>
+                            <p>Gunakan tombol <strong>Bayar</strong> dan <strong>Arsipkan</strong> di daftar nota. Input nota baru tidak tersedia untuk role ini.</p>
+                        <?php else: ?>
+                            <p>Role Anda difokuskan untuk operasional gudang.</p>
+                            <p>Gunakan tombol <strong>Input Pengirim</strong> atau <strong>Edit Pengirim</strong> di daftar nota untuk mengisi nama pengirim.</p>
+                        <?php endif; ?>
                     </div>
                 <?php else: ?>
                     <form method="post" class="nota-form">

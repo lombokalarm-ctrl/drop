@@ -566,7 +566,7 @@ function canArchiveNote(array $user, array $note): bool
 
 function canEditNote(array $user, array $note): bool
 {
-    if (in_array($user['role'], ['owner', 'staff'], true)) {
+    if ($user['role'] === 'owner') {
         return true;
     }
 
@@ -584,7 +584,7 @@ function canPayNote(array $user, array $note): bool
 
 function canManageSender(array $user, array $note): bool
 {
-    if (in_array($user['role'], ['owner', 'staff', 'gudang'], true)) {
+    if (in_array($user['role'], ['owner', 'gudang'], true)) {
         return true;
     }
 
@@ -593,7 +593,7 @@ function canManageSender(array $user, array $note): bool
 
 function canCreateNote(array $user): bool
 {
-    return in_array($user['role'], ['owner', 'staff', 'sales'], true);
+    return in_array($user['role'], ['owner', 'sales'], true);
 }
 
 function getUserScopeWhere(array $user, string $tableAlias = ''): array

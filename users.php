@@ -382,9 +382,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [] && (string)($_POST['
                     <div class="auth-note">
                         <strong>Role saat ini:</strong>
                         <ul>
-                            <li><strong>Staff</strong>: kelola user, input nota, edit nota, lihat arsip, dan input pembayaran.</li>
+                            <li><strong>Staff</strong>: fokus untuk input pembayaran dan arsipkan nota, tanpa input nota baru.</li>
                             <li><strong>Sales</strong>: input dan edit nota yang dia buat sendiri.</li>
-                            <li><strong>Gudang</strong>: fokus mengisi data pengirim dari daftar nota.</li>
+                            <li><strong>Gudang</strong>: hanya fokus mengisi nama pengirim dari daftar nota.</li>
                         </ul>
                     </div>
                 <?php endif; ?>
