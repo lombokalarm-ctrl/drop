@@ -427,18 +427,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             <div>
                 <p class="eyebrow">Aplikasi Operasional</p>
                 <h1><?= $isArchivePage ? 'Arsip Nota Dropping' : 'Pencatatan Pembayaran Nota Dropping' ?></h1>
-                <p class="hero-text">
-                    <?= $isArchivePage
-                        ? 'Lihat data nota yang sudah diarsipkan dan hapus permanen bila memang sudah tidak diperlukan.'
-                        : 'Catat outlet yang belum bisa bayar saat sales menagih, lalu kirim ulang nota lama bersama order baru dengan data yang rapi.' ?>
-                </p>
             </div>
             <div class="hero-badges">
                 <span class="badge badge-neutral"><?= htmlspecialchars($currentUser['full_name'], ENT_QUOTES, 'UTF-8') ?></span>
-                <span class="badge badge-neutral"><?= roleLabel((string)$currentUser['role']) ?></span>
-                <span class="badge">XAMPP Ready</span>
-                <span class="badge">SQLite Lokal</span>
-                <span class="badge">Mobile Dense</span>
                 <?php if (canViewArchive($currentUser)): ?>
                     <a class="badge badge-link" href="<?= $isArchivePage ? 'index.php' : 'index.php?page=arsip' ?>">
                         <?= $isArchivePage ? 'Halaman Utama' : 'Halaman Arsip' ?>
@@ -499,7 +490,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             <section class="card pwa-mobile-menu" id="pwaMobileMenu" hidden>
                 <div>
                     <strong>Menu Daftar Nota</strong>
-                    <p>Buka daftar nota sebagai tampilan terpisah saat aplikasi dijalankan dari PWA di smartphone.</p>
                 </div>
                 <button type="button" class="btn btn-primary" id="openListViewButton">Daftar Nota</button>
             </section>
