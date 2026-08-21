@@ -538,7 +538,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                         <div class="field-grid">
                             <label>
                                 <span>Tanggal Pembuatan</span>
-                                <input type="text" value="<?= htmlspecialchars(formatDateTimeId((string)$formData['created_at']), ENT_QUOTES, 'UTF-8') ?>" readonly>
+                                <input type="text" value="<?= htmlspecialchars(formatDateId((string)$formData['created_at']), ENT_QUOTES, 'UTF-8') ?>" readonly>
                             </label>
 
                             <label>
@@ -751,7 +751,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
                             <label>
                                 <span>Tanggal Pembuatan</span>
-                                <input type="text" id="payModalCreatedAt" value="<?= htmlspecialchars($payData ? formatDateTimeId($payData['created_at']) : '', ENT_QUOTES, 'UTF-8') ?>" readonly>
+                                <input type="text" id="payModalCreatedAt" value="<?= htmlspecialchars($payData ? formatDateId($payData['created_at']) : '', ENT_QUOTES, 'UTF-8') ?>" readonly>
                             </label>
 
                             <label>
@@ -874,6 +874,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
         };
 
         const parseDigits = (value) => Number((value || '').replace(/\D/g, '')) || 0;
+        const countDigits = (value) => (value.match(/\d/g) || []).length;
+        const getCaretFromDigitIndex = (formattedValue, digitIndex) => {
+            if (digitIndex <= 0) {
+                return 0;
+            }
+
+            let digitsSeen = 0;
+
+            for (let index = 0; index < formattedValue.length; index += 1) {
+                if (/\d/.test(formattedValue[index])) {
+                    digitsSeen += 1;
+                }
+
+                if (digitsSeen >= digitIndex) {
+                    return index + 1;
+                }
+            }
+
+            return formattedValue.length;
+        };
 
         const updatePayPreview = () => {
             if (!payInvoiceValueInput || !payCurrentAmountInput || !payIncrementInput || !payStatusPreview || !payRemainingAfterInput || !payRemainingBeforeInput) {
@@ -957,9 +977,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
         currencyInputs.forEach((input) => {
             input.value = formatNumber(input.value);
             input.addEventListener('input', (event) => {
-                const start = event.target.selectionStart;
-                event.target.value = formatNumber(event.target.value);
-                event.target.setSelectionRange(start, start);
+                const rawValue = event.target.value;
+                const caretStart = event.target.selectionStart ?? rawValue.length;
+                const digitIndex = countDigits(rawValue.slice(0, caretStart));
+                const formattedValue = formatNumber(rawValue);
+
+                event.target.value = formattedValue;
+
+                if (
+                    document.activeElement === event.target
+                    && typeof event.target.setSelectionRange === 'function'
+                    && !event.target.readOnly
+                ) {
+                    const nextCaret = getCaretFromDigitIndex(formattedValue, digitIndex);
+                    event.target.setSelectionRange(nextCaret, nextCaret);
+                }
+
                 updatePayPreview();
             });
         });
