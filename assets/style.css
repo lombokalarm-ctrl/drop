@@ -503,6 +503,7 @@ tbody td {
     padding: 11px 12px;
     border-bottom: 1px solid var(--line);
     vertical-align: top;
+    white-space: nowrap;
 }
 
 tbody tr:hover {
@@ -517,6 +518,10 @@ tbody td small {
 tbody td small {
     margin-top: 3px;
     color: var(--muted);
+}
+
+.table-wrap .action-group {
+    flex-wrap: nowrap;
 }
 
 .status-pill.belum_bayar {

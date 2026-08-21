@@ -205,7 +205,7 @@ function createNotaDroppingTable(PDO $pdo, string $driver): void
                 id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
                 outlet_code VARCHAR(50) NOT NULL,
                 outlet_name VARCHAR(180) NOT NULL,
-                invoice_date DATE NOT NULL,
+                invoice_date VARCHAR(100) NOT NULL,
                 invoice_value BIGINT UNSIGNED NOT NULL,
                 payment_amount BIGINT UNSIGNED NOT NULL DEFAULT 0,
                 sales_name VARCHAR(150) NOT NULL,
@@ -279,6 +279,15 @@ function synchronizeLegacyColumns(PDO $pdo, string $driver): void
         $pdo->exec($driver === 'mysql'
             ? 'ALTER TABLE nota_dropping ADD COLUMN updated_by_user_id INT UNSIGNED NULL DEFAULT NULL'
             : 'ALTER TABLE nota_dropping ADD COLUMN updated_by_user_id INTEGER DEFAULT NULL');
+    }
+
+    if ($driver === 'mysql') {
+        $invoiceDateColumn = $pdo->query("SHOW COLUMNS FROM `nota_dropping` LIKE 'invoice_date'")->fetch();
+        $invoiceDateType = strtolower((string)($invoiceDateColumn['Type'] ?? ''));
+
+        if ($invoiceDateType !== '' && !str_contains($invoiceDateType, 'char') && !str_contains($invoiceDateType, 'text')) {
+            $pdo->exec('ALTER TABLE nota_dropping MODIFY COLUMN invoice_date VARCHAR(100) NOT NULL');
+        }
     }
 }
 

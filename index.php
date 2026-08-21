@@ -191,8 +191,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $existingData = $id > 0 ? findNota($pdo, $id) : null;
         $outletCode = trim((string)($_POST['outlet_code'] ?? ''));
         $outletName = trim((string)($_POST['outlet_name'] ?? ''));
-        $invoiceDateInput = trim((string)($_POST['invoice_date'] ?? ''));
-        $invoiceDate = parseDateIdInput($invoiceDateInput);
+        $invoiceDate = trim((string)($_POST['invoice_date'] ?? ''));
         $invoiceValue = (int)preg_replace('/\D+/', '', (string)($_POST['invoice_value'] ?? '0'));
         $salesName = $currentUser['role'] === 'sales'
             ? (string)$currentUser['full_name']
@@ -210,10 +209,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($outletName === '') {
             $errors[] = 'Nama outlet wajib diisi.';
         }
-        if ($invoiceDateInput === '') {
+        if ($invoiceDate === '') {
             $errors[] = 'Tanggal nota wajib diisi.';
-        } elseif ($invoiceDate === null) {
-            $errors[] = 'Tanggal nota harus diisi manual dengan format dd-mm-yyyy.';
         }
         if ($invoiceValue <= 0) {
             $errors[] = 'Nilai nota harus lebih dari 0.';
@@ -346,7 +343,7 @@ if ($where !== []) {
 }
 $sql .= $isArchivePage
     ? ' ORDER BY archived_at DESC, updated_at DESC, id DESC'
-    : ' ORDER BY invoice_date DESC, id DESC';
+    : ' ORDER BY created_at DESC, id DESC';
 
 $statement = $pdo->prepare($sql);
 $statement->execute($params);
@@ -558,7 +555,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
                             <label>
                                 <span>Tanggal Nota</span>
-                                <input type="text" name="invoice_date" value="<?= htmlspecialchars((string)($formData['invoice_date'] !== '' ? formatDateId((string)$formData['invoice_date']) : ''), ENT_QUOTES, 'UTF-8') ?>" placeholder="dd-mm-yyyy" inputmode="numeric" required>
+                                <input type="text" name="invoice_date" value="<?= htmlspecialchars((string)$formData['invoice_date'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Tulis bebas" required>
                             </label>
 
                             <label>
@@ -604,9 +601,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                     <table>
                         <thead>
                             <tr>
+                                <th>Dibuat</th>
                                 <th>Outlet</th>
                                 <th>Tanggal Nota</th>
-                                <th>Dibuat</th>
                                 <?php if ($isArchivePage): ?>
                                     <th>Diarsipkan</th>
                                 <?php endif; ?>
@@ -614,7 +611,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                 <th>Dibayar</th>
                                 <th>Sisa Hutang</th>
                                 <th>Sales</th>
-                                <th>Status</th>
                                 <th>Pengirim</th>
                                 <th>Aksi</th>
                             </tr>
@@ -622,7 +618,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                         <tbody>
                             <?php if ($rows === []): ?>
                                 <tr>
-                                    <td colspan="<?= $isArchivePage ? '11' : '10' ?>" class="empty-state">
+                                    <td colspan="<?= $isArchivePage ? '10' : '9' ?>" class="empty-state">
                                         <?= $isArchivePage ? 'Belum ada data arsip nota dropping.' : 'Belum ada data nota dropping.' ?>
                                     </td>
                                 </tr>
@@ -630,12 +626,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                 <?php foreach ($rows as $row): ?>
                                     <?php $remainingAmount = getRemainingAmount((int)$row['invoice_value'], (int)$row['payment_amount']); ?>
                                     <tr>
+                                        <td><?= formatDateId($row['created_at']) ?></td>
                                         <td>
-                                            <strong><?= htmlspecialchars($row['outlet_name'], ENT_QUOTES, 'UTF-8') ?></strong>
-                                            <small><?= htmlspecialchars($row['outlet_code'], ENT_QUOTES, 'UTF-8') ?></small>
+                                            <?= htmlspecialchars($row['outlet_name'] . ' (' . $row['outlet_code'] . ')', ENT_QUOTES, 'UTF-8') ?>
                                         </td>
-                                        <td><?= formatDateId($row['invoice_date']) ?></td>
-                                        <td><?= formatDateTimeId($row['created_at']) ?></td>
+                                        <td><?= htmlspecialchars((string)$row['invoice_date'], ENT_QUOTES, 'UTF-8') ?></td>
                                         <?php if ($isArchivePage): ?>
                                             <td><?= formatDateTimeId($row['archived_at']) ?></td>
                                         <?php endif; ?>
@@ -643,11 +638,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                         <td><?= formatCurrency((int)$row['payment_amount']) ?></td>
                                         <td><?= formatCurrency($remainingAmount) ?></td>
                                         <td><?= htmlspecialchars($row['sales_name'], ENT_QUOTES, 'UTF-8') ?></td>
-                                        <td>
-                                            <span class="status-pill <?= $row['payment_status'] ?>">
-                                                <?= $row['payment_status'] === 'sudah_bayar' ? 'Lunas' : 'Masih Hutang' ?>
-                                            </span>
-                                        </td>
                                         <td><?= htmlspecialchars($row['sender_name'] !== '' ? $row['sender_name'] : '-', ENT_QUOTES, 'UTF-8') ?></td>
                                         <td>
                                             <div class="action-group">
@@ -669,8 +659,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                                             class="btn btn-small btn-primary js-open-pay-modal"
                                                             data-id="<?= (int)$row['id'] ?>"
                                                             data-outlet="<?= htmlspecialchars($row['outlet_name'] . ' (' . $row['outlet_code'] . ')', ENT_QUOTES, 'UTF-8') ?>"
-                                                            data-invoice-date="<?= htmlspecialchars(formatDateId($row['invoice_date']), ENT_QUOTES, 'UTF-8') ?>"
-                                                            data-created-at="<?= htmlspecialchars(formatDateTimeId($row['created_at']), ENT_QUOTES, 'UTF-8') ?>"
+                                                            data-invoice-date="<?= htmlspecialchars((string)$row['invoice_date'], ENT_QUOTES, 'UTF-8') ?>"
+                                                            data-created-at="<?= htmlspecialchars(formatDateId($row['created_at']), ENT_QUOTES, 'UTF-8') ?>"
                                                             data-invoice-value="<?= (int)$row['invoice_value'] ?>"
                                                             data-current-payment="<?= (int)$row['payment_amount'] ?>"
                                                             data-remaining="<?= $remainingAmount ?>"
@@ -691,7 +681,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                                             class="btn btn-small btn-secondary js-open-sender-modal"
                                                             data-id="<?= (int)$row['id'] ?>"
                                                             data-outlet="<?= htmlspecialchars($row['outlet_name'] . ' (' . $row['outlet_code'] . ')', ENT_QUOTES, 'UTF-8') ?>"
-                                                            data-invoice-date="<?= htmlspecialchars(formatDateId($row['invoice_date']), ENT_QUOTES, 'UTF-8') ?>"
+                                                            data-invoice-date="<?= htmlspecialchars((string)$row['invoice_date'], ENT_QUOTES, 'UTF-8') ?>"
                                                             data-sales-name="<?= htmlspecialchars($row['sales_name'], ENT_QUOTES, 'UTF-8') ?>"
                                                             data-sender-name="<?= htmlspecialchars($row['sender_name'], ENT_QUOTES, 'UTF-8') ?>"
                                                         >
@@ -746,7 +736,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
                             <label>
                                 <span>Tanggal Nota</span>
-                                <input type="text" id="payModalInvoiceDate" value="<?= htmlspecialchars($payData ? formatDateId($payData['invoice_date']) : '', ENT_QUOTES, 'UTF-8') ?>" readonly>
+                                <input type="text" id="payModalInvoiceDate" value="<?= htmlspecialchars($payData['invoice_date'] ?? '', ENT_QUOTES, 'UTF-8') ?>" readonly>
                             </label>
 
                             <label>
@@ -813,7 +803,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
                             <label>
                                 <span>Tanggal Nota</span>
-                                <input type="text" id="senderModalInvoiceDate" value="<?= htmlspecialchars($senderData ? formatDateId($senderData['invoice_date']) : '', ENT_QUOTES, 'UTF-8') ?>" readonly>
+                                <input type="text" id="senderModalInvoiceDate" value="<?= htmlspecialchars($senderData['invoice_date'] ?? '', ENT_QUOTES, 'UTF-8') ?>" readonly>
                             </label>
 
                             <label>
