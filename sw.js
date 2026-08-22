@@ -1,8 +1,8 @@
-const CACHE_NAME = 'nota-dropping-pwa-v3';
+const CACHE_NAME = 'nota-dropping-pwa-v4';
 const APP_SHELL = [
     './',
     './index.php',
-    './manifest.webmanifest',
+    './manifest.webmanifest?v=4',
     './assets/style.css',
     './assets/icon.svg',
     './assets/icon-192.png',

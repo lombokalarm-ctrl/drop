@@ -414,7 +414,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Nota Dropping">
     <title>Pencatatan Pembayaran Nota Dropping</title>
-    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="manifest" href="manifest.webmanifest?v=4">
     <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/icon-180.png">
     <link rel="stylesheet" href="assets/style.css">
