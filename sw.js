@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nota-dropping-pwa-v2';
+const CACHE_NAME = 'nota-dropping-pwa-v3';
 const APP_SHELL = [
     './',
     './index.php',
