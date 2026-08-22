@@ -52,6 +52,10 @@ select {
     font: inherit;
 }
 
+input[data-lowercase-name] {
+    text-transform: lowercase;
+}
+
 .page {
     max-width: 1380px;
     margin: 0 auto;
@@ -442,6 +446,21 @@ select {
     padding-left: 18px;
 }
 
+.password-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.password-field input {
+    flex: 1;
+}
+
+.password-toggle {
+    flex-shrink: 0;
+    min-width: 96px;
+}
+
 .pay-modal-overlay {
     position: fixed;
     inset: 0;
@@ -690,6 +709,28 @@ tbody td small {
     }
 }
 
+@media (max-width: 960px) and (orientation: landscape) {
+    .page {
+        padding: 10px;
+    }
+
+    .hero {
+        padding: 14px;
+    }
+
+    .summary-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .summary-card {
+        min-height: 72px;
+    }
+
+    table {
+        width: max(100%, 1120px);
+    }
+}
+
 @media (max-width: 720px) {
     body.pwa-mobile-mode .pwa-mobile-menu {
         display: flex;
@@ -732,5 +773,15 @@ tbody td small {
         max-height: 85vh;
         border-bottom-left-radius: 0;
         border-bottom-right-radius: 0;
+    }
+
+    .password-field {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .password-toggle {
+        min-width: 0;
+        width: 100%;
     }
 }

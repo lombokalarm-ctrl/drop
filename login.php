@@ -80,7 +80,10 @@ $flash = getFlash();
 
                     <label>
                         <span>Password</span>
-                        <input type="password" name="password" autocomplete="current-password" required>
+                        <div class="password-field">
+                            <input type="password" name="password" id="loginPasswordInput" autocomplete="current-password" required>
+                            <button type="button" class="btn btn-secondary btn-small password-toggle" id="toggleLoginPasswordButton" aria-controls="loginPasswordInput" aria-label="Lihat password">Lihat</button>
+                        </div>
                     </label>
                 </div>
 
@@ -91,5 +94,18 @@ $flash = getFlash();
 
         </section>
     </main>
+    <script>
+        const loginPasswordInput = document.getElementById('loginPasswordInput');
+        const toggleLoginPasswordButton = document.getElementById('toggleLoginPasswordButton');
+
+        if (loginPasswordInput && toggleLoginPasswordButton) {
+            toggleLoginPasswordButton.addEventListener('click', () => {
+                const nextType = loginPasswordInput.type === 'password' ? 'text' : 'password';
+                loginPasswordInput.type = nextType;
+                toggleLoginPasswordButton.textContent = nextType === 'password' ? 'Lihat' : 'Sembunyikan';
+                toggleLoginPasswordButton.setAttribute('aria-label', nextType === 'password' ? 'Lihat password' : 'Sembunyikan password');
+            });
+        }
+    </script>
 </body>
 </html>

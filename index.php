@@ -146,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'update_sender') {
         $id = (int)($_POST['id'] ?? 0);
         $senderData = $id > 0 ? findNota($pdo, $id) : null;
-        $senderName = trim((string)($_POST['sender_name'] ?? ''));
+        $senderName = normalizeLowercaseName((string)($_POST['sender_name'] ?? ''));
         $senderFormData = [
             'sender_name' => $senderName,
         ];
@@ -190,12 +190,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
         $existingData = $id > 0 ? findNota($pdo, $id) : null;
         $outletCode = trim((string)($_POST['outlet_code'] ?? ''));
-        $outletName = trim((string)($_POST['outlet_name'] ?? ''));
+        $outletName = normalizeLowercaseName((string)($_POST['outlet_name'] ?? ''));
         $invoiceDate = trim((string)($_POST['invoice_date'] ?? ''));
         $invoiceValue = (int)preg_replace('/\D+/', '', (string)($_POST['invoice_value'] ?? '0'));
-        $salesName = trim((string)($_POST['sales_name'] ?? ''));
+        $salesName = normalizeLowercaseName((string)($_POST['sales_name'] ?? ''));
         $paymentAmount = $existingData ? (int)$existingData['payment_amount'] : 0;
-        $senderName = $existingData ? (string)$existingData['sender_name'] : '';
+        $senderName = $existingData ? normalizeLowercaseName((string)$existingData['sender_name']) : '';
 
         if ($id === 0 && !canCreateNote($currentUser)) {
             $errors[] = 'Role Anda tidak diizinkan menambah nota baru.';
@@ -386,19 +386,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
         $formData = [
             'id' => (int)($_POST['id'] ?? 0),
             'outlet_code' => $_POST['outlet_code'] ?? '',
-            'outlet_name' => $_POST['outlet_name'] ?? '',
+            'outlet_name' => normalizeLowercaseName((string)($_POST['outlet_name'] ?? '')),
             'invoice_date' => $_POST['invoice_date'] ?? '',
             'created_at' => $_POST['created_at'] ?? (new DateTimeImmutable())->format('Y-m-d H:i:s'),
             'invoice_value' => preg_replace('/\D+/', '', (string)($_POST['invoice_value'] ?? '')),
             'payment_amount' => $editData ? (string)$editData['payment_amount'] : '0',
-            'sales_name' => $_POST['sales_name'] ?? '',
+            'sales_name' => normalizeLowercaseName((string)($_POST['sales_name'] ?? '')),
             'payment_status' => $editData && (int)$editData['payment_amount'] > 0
                 ? calculatePaymentStatus(
                     (int)preg_replace('/\D+/', '', (string)($_POST['invoice_value'] ?? '0')),
                     (int)$editData['payment_amount']
                 )
                 : 'belum_bayar',
-            'sender_name' => $_POST['sender_name'] ?? '',
+            'sender_name' => normalizeLowercaseName((string)($_POST['sender_name'] ?? '')),
         ];
     }
 }
@@ -521,7 +521,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                             <p>Gunakan tombol <strong>Bayar</strong> dan <strong>Arsipkan</strong> di daftar nota. Input nota baru tidak tersedia untuk role ini.</p>
                         <?php else: ?>
                             <p>Role Anda difokuskan untuk operasional gudang.</p>
-                            <p>Gunakan tombol <strong>Input Pengirim</strong> atau <strong>Edit Pengirim</strong> di daftar nota untuk mengisi nama pengirim.</p>
+                            <p>Gunakan tombol <strong>Input Pengirim</strong> di daftar nota untuk mengisi nama pengirim satu kali.</p>
                         <?php endif; ?>
                     </div>
                 <?php else: ?>
@@ -538,7 +538,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
                             <label>
                                 <span>Nama Sales</span>
-                                <input type="text" name="sales_name" value="<?= htmlspecialchars((string)$formData['sales_name'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama sales" required>
+                                <input type="text" name="sales_name" data-lowercase-name value="<?= htmlspecialchars((string)$formData['sales_name'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama sales" autocapitalize="off" required>
                             </label>
 
                             <label>
@@ -548,7 +548,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
                             <label>
                                 <span>Nama Outlet</span>
-                                <input type="text" name="outlet_name" value="<?= htmlspecialchars((string)$formData['outlet_name'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama toko / outlet" required>
+                                <input type="text" name="outlet_name" data-lowercase-name value="<?= htmlspecialchars((string)$formData['outlet_name'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama toko / outlet" autocapitalize="off" required>
                             </label>
 
                             <label>
@@ -811,7 +811,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
                             <label>
                                 <span>Pengirim</span>
-                                <input type="text" name="sender_name" id="senderModalSenderName" value="<?= htmlspecialchars($modalSenderValue, ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama team gudang / pengirim" required>
+                                <input type="text" name="sender_name" id="senderModalSenderName" data-lowercase-name value="<?= htmlspecialchars($modalSenderValue, ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama team gudang / pengirim" autocapitalize="off" required>
                             </label>
                         </div>
 
@@ -851,6 +851,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
         const closeSenderModalButton = document.getElementById('closeSenderModalButton');
         const cancelSenderModalButton = document.getElementById('cancelSenderModalButton');
         const senderModalTriggers = document.querySelectorAll('.js-open-sender-modal');
+        const lowercaseNameInputs = document.querySelectorAll('[data-lowercase-name]');
 
         const formatNumber = (value) => {
             const digits = value.replace(/\D/g, '');
@@ -862,6 +863,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
         };
 
         const parseDigits = (value) => Number((value || '').replace(/\D/g, '')) || 0;
+        const normalizeLowercaseName = (value) => value.toLocaleLowerCase('id-ID');
         const countDigits = (value) => (value.match(/\d/g) || []).length;
         const getCaretFromDigitIndex = (formattedValue, digitIndex) => {
             if (digitIndex <= 0) {
@@ -985,6 +987,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             });
         });
 
+        lowercaseNameInputs.forEach((input) => {
+            input.addEventListener('input', (event) => {
+                const element = event.target;
+                const caretStart = element.selectionStart ?? element.value.length;
+                const normalizedValue = normalizeLowercaseName(element.value);
+
+                element.value = normalizedValue;
+
+                if (typeof element.setSelectionRange === 'function') {
+                    element.setSelectionRange(caretStart, caretStart);
+                }
+            });
+        });
+
         updatePayPreview();
 
         payModalTriggers.forEach((button) => {
@@ -1074,9 +1090,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
         const mobileViewport = window.matchMedia('(max-width: 720px)');
+        const landscapeViewport = window.matchMedia('(orientation: landscape)');
 
         const syncPwaMobileListMode = () => {
-            const enableMobilePwaMode = isStandalone && mobileViewport.matches && !isArchivePage;
+            const enableMobilePwaMode = isStandalone && mobileViewport.matches && !landscapeViewport.matches && !isArchivePage;
 
             document.body.classList.toggle('pwa-mobile-mode', enableMobilePwaMode);
 
@@ -1152,6 +1169,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             mobileViewport.addEventListener('change', syncPwaMobileListMode);
         } else if (typeof mobileViewport.addListener === 'function') {
             mobileViewport.addListener(syncPwaMobileListMode);
+        }
+
+        if (typeof landscapeViewport.addEventListener === 'function') {
+            landscapeViewport.addEventListener('change', syncPwaMobileListMode);
+        } else if (typeof landscapeViewport.addListener === 'function') {
+            landscapeViewport.addListener(syncPwaMobileListMode);
         }
 
         syncPwaMobileListMode();

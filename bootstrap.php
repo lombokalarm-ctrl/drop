@@ -518,6 +518,20 @@ function formatNumberId(int $amount): string
     return number_format($amount, 0, ',', '.');
 }
 
+function normalizeLowercaseName(?string $value): string
+{
+    $normalized = trim((string)$value);
+    if ($normalized === '') {
+        return '';
+    }
+
+    if (function_exists('mb_strtolower')) {
+        return mb_strtolower($normalized, 'UTF-8');
+    }
+
+    return strtolower($normalized);
+}
+
 function calculatePaymentStatus(int $invoiceValue, int $paymentAmount): string
 {
     return $paymentAmount >= $invoiceValue ? 'sudah_bayar' : 'belum_bayar';
@@ -635,8 +649,12 @@ function canPayNote(array $user, array $note): bool
 
 function canManageSender(array $user, array $note): bool
 {
-    if (in_array($user['role'], ['owner', 'manager', 'gudang'], true)) {
+    if (in_array($user['role'], ['owner', 'manager'], true)) {
         return true;
+    }
+
+    if ($user['role'] === 'gudang') {
+        return trim((string)($note['sender_name'] ?? '')) === '';
     }
 
     return false;
