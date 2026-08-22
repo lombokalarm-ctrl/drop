@@ -549,6 +549,10 @@ tbody td small {
     margin: 0;
 }
 
+.table-wrap .action-group {
+    align-items: flex-start;
+}
+
 .table-wrap .action-group .btn,
 .table-wrap .action-group form .btn {
     white-space: nowrap;
@@ -627,6 +631,30 @@ tbody td small {
 
     .form-card .field-grid input,
     .form-card .field-grid select {
+        padding: 9px 10px;
+        font-size: 13px;
+    }
+
+    .pay-modal .field-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .pay-modal .field-grid label {
+        display: grid;
+        grid-template-columns: 112px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
+    }
+
+    .pay-modal .field-grid span {
+        margin-bottom: 0;
+        font-size: 11px;
+        line-height: 1.2;
+    }
+
+    .pay-modal .field-grid input,
+    .pay-modal .field-grid select {
         padding: 9px 10px;
         font-size: 13px;
     }

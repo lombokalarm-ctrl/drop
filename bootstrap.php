@@ -619,6 +619,11 @@ function canViewArchive(array $user): bool
     return in_array($user['role'], ['owner', 'manager', 'staff'], true);
 }
 
+function canViewPaymentStatus(array $user): bool
+{
+    return in_array($user['role'], ['owner', 'manager', 'staff'], true);
+}
+
 function canDeletePermanent(array $user): bool
 {
     return hasOwnerAccess($user);
