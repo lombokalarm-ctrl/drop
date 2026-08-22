@@ -383,7 +383,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [] && (string)($_POST['
                         <strong>Role saat ini:</strong>
                         <ul>
                             <li><strong>Staff</strong>: fokus untuk input pembayaran dan arsipkan nota, tanpa input nota baru.</li>
-                            <li><strong>Sales</strong>: input dan edit nota yang dia buat sendiri.</li>
+                            <li><strong>Sales</strong>: fokus input nota baru dengan nama sales diisi manual.</li>
                             <li><strong>Gudang</strong>: hanya fokus mengisi nama pengirim dari daftar nota.</li>
                         </ul>
                     </div>

@@ -193,9 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $outletName = trim((string)($_POST['outlet_name'] ?? ''));
         $invoiceDate = trim((string)($_POST['invoice_date'] ?? ''));
         $invoiceValue = (int)preg_replace('/\D+/', '', (string)($_POST['invoice_value'] ?? '0'));
-        $salesName = $currentUser['role'] === 'sales'
-            ? (string)$currentUser['full_name']
-            : trim((string)($_POST['sales_name'] ?? ''));
+        $salesName = trim((string)($_POST['sales_name'] ?? ''));
         $paymentAmount = $existingData ? (int)$existingData['payment_amount'] : 0;
         $senderName = $existingData ? (string)$existingData['sender_name'] : '';
 
@@ -378,7 +376,7 @@ $formData = $editData ?? [
     'created_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
     'invoice_value' => '',
     'payment_amount' => '0',
-    'sales_name' => $currentUser['role'] === 'sales' ? $currentUser['full_name'] : '',
+    'sales_name' => '',
     'payment_status' => 'belum_bayar',
     'sender_name' => '',
 ];
@@ -393,7 +391,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             'created_at' => $_POST['created_at'] ?? (new DateTimeImmutable())->format('Y-m-d H:i:s'),
             'invoice_value' => preg_replace('/\D+/', '', (string)($_POST['invoice_value'] ?? '')),
             'payment_amount' => $editData ? (string)$editData['payment_amount'] : '0',
-            'sales_name' => $currentUser['role'] === 'sales' ? $currentUser['full_name'] : ($_POST['sales_name'] ?? ''),
+            'sales_name' => $_POST['sales_name'] ?? '',
             'payment_status' => $editData && (int)$editData['payment_amount'] > 0
                 ? calculatePaymentStatus(
                     (int)preg_replace('/\D+/', '', (string)($_POST['invoice_value'] ?? '0')),
@@ -435,7 +433,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                         <?= $isArchivePage ? 'Halaman Utama' : 'Halaman Arsip' ?>
                     </a>
                 <?php endif; ?>
-                <a class="badge badge-link" href="<?= canManageUsers($currentUser) ? 'users.php' : 'account.php' ?>"><?= canManageUsers($currentUser) ? 'Kelola User' : 'Akun Saya' ?></a>
+                <?php if (canManageUsers($currentUser)): ?>
+                    <a class="badge badge-link" href="users.php">Kelola User</a>
+                <?php endif; ?>
                 <a class="badge badge-link" href="logout.php">Logout</a>
             </div>
             <div class="hero-actions">
@@ -538,7 +538,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
                             <label>
                                 <span>Nama Sales</span>
-                                <input type="text" name="sales_name" value="<?= htmlspecialchars((string)$formData['sales_name'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama sales" <?= $currentUser['role'] === 'sales' ? 'readonly' : '' ?> required>
+                                <input type="text" name="sales_name" value="<?= htmlspecialchars((string)$formData['sales_name'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Nama sales" required>
                             </label>
 
                             <label>

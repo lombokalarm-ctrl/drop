@@ -561,16 +561,12 @@ function canArchiveNote(array $user, array $note): bool
         return true;
     }
 
-    return $user['role'] === 'sales' && (int)($note['created_by_user_id'] ?? 0) === (int)$user['id'];
+    return false;
 }
 
 function canEditNote(array $user, array $note): bool
 {
-    if ($user['role'] === 'owner') {
-        return true;
-    }
-
-    return $user['role'] === 'sales' && (int)($note['created_by_user_id'] ?? 0) === (int)$user['id'];
+    return $user['role'] === 'owner';
 }
 
 function canPayNote(array $user, array $note): bool
