@@ -5,7 +5,7 @@ require __DIR__ . '/bootstrap.php';
 
 $currentUser = requireLogin($pdo);
 if (!canManageUsers($currentUser)) {
-    setFlash('error', 'Halaman user hanya bisa dibuka oleh owner.');
+    setFlash('error', 'Halaman user hanya bisa dibuka oleh owner atau manager.');
     redirectToIndex();
 }
 $canManageAllUsers = canManageUsers($currentUser);
@@ -82,8 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$targetUser) {
             setFlash('error', 'User yang ingin diubah statusnya tidak ditemukan.');
         } else {
-            if ($targetUser['role'] === 'owner' && $currentUser['role'] !== 'owner') {
-                setFlash('error', 'Hanya owner yang bisa mengubah status akun owner.');
+            if (in_array((string)$targetUser['role'], ['owner', 'manager'], true) && !hasOwnerAccess($currentUser)) {
+                setFlash('error', 'Hanya owner atau manager yang bisa mengubah status akun owner/manager.');
                 redirectTo('users.php');
             }
 
@@ -94,8 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirectTo('users.php');
             }
 
-            if ($nextStatus === 0 && $targetUser['role'] === 'owner' && countActiveOwners($pdo, (int)$targetUser['id']) === 0) {
-                setFlash('error', 'Minimal harus ada satu owner aktif di aplikasi.');
+            if ($nextStatus === 0 && in_array((string)$targetUser['role'], ['owner', 'manager'], true) && countActivePrivilegedUsers($pdo, (int)$targetUser['id']) === 0) {
+                setFlash('error', 'Minimal harus ada satu akun owner/manager aktif di aplikasi.');
                 redirectTo('users.php');
             }
 
@@ -135,8 +135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $role = (string)($_POST['role'] ?? 'staff');
         $password = (string)($_POST['password'] ?? '');
 
-        if ($existingUser && $existingUser['role'] === 'owner' && $currentUser['role'] !== 'owner') {
-            $errors[] = 'Hanya owner yang bisa mengubah akun owner.';
+        if ($existingUser && in_array((string)$existingUser['role'], ['owner', 'manager'], true) && !hasOwnerAccess($currentUser)) {
+            $errors[] = 'Hanya owner atau manager yang bisa mengubah akun owner/manager.';
         }
 
         if ($fullName === '') {
@@ -150,8 +150,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $allowedRoles = ['staff', 'sales', 'gudang'];
-        if ($currentUser['role'] === 'owner' || ($existingUser && $existingUser['role'] === 'owner')) {
+        if (hasOwnerAccess($currentUser) || ($existingUser && in_array((string)$existingUser['role'], ['owner', 'manager'], true))) {
             $allowedRoles[] = 'owner';
+            $allowedRoles[] = 'manager';
         }
 
         if (!in_array($role, $allowedRoles, true)) {
@@ -175,8 +176,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Username sudah dipakai user lain.';
         }
 
-        if ($existingUser && $existingUser['role'] === 'owner' && $role !== 'owner' && countActiveOwners($pdo, (int)$existingUser['id']) === 0) {
-            $errors[] = 'Role owner terakhir tidak bisa diubah sebelum ada owner aktif lain.';
+        if (
+            $existingUser
+            && in_array((string)$existingUser['role'], ['owner', 'manager'], true)
+            && !in_array($role, ['owner', 'manager'], true)
+            && countActivePrivilegedUsers($pdo, (int)$existingUser['id']) === 0
+        ) {
+            $errors[] = 'Role owner/manager terakhir tidak bisa diubah sebelum ada akun owner atau manager aktif lain.';
         }
 
         if ($errors === []) {
@@ -231,6 +237,7 @@ $statement = $pdo->query(
         COUNT(*) AS total_user,
         SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS total_aktif,
         SUM(CASE WHEN role = 'owner' THEN 1 ELSE 0 END) AS total_owner,
+        SUM(CASE WHEN role = 'manager' THEN 1 ELSE 0 END) AS total_manager,
         SUM(CASE WHEN role = 'staff' THEN 1 ELSE 0 END) AS total_staff,
         SUM(CASE WHEN role = 'sales' THEN 1 ELSE 0 END) AS total_sales,
         SUM(CASE WHEN role = 'gudang' THEN 1 ELSE 0 END) AS total_gudang
@@ -300,6 +307,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [] && (string)($_POST['
                 <strong><?= (int)($summary['total_owner'] ?? 0) ?></strong>
             </article>
             <article class="card summary-card">
+                <span class="summary-label">Manager</span>
+                <strong><?= (int)($summary['total_manager'] ?? 0) ?></strong>
+            </article>
+            <article class="card summary-card">
                 <span class="summary-label">Staff</span>
                 <strong><?= (int)($summary['total_staff'] ?? 0) ?></strong>
             </article>
@@ -358,8 +369,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [] && (string)($_POST['
                             <label>
                                 <span>Role</span>
                                 <select name="role" required>
-                                    <?php if ((string)$formData['role'] === 'owner' && $currentUser['role'] === 'owner'): ?>
-                                        <option value="owner" selected>Owner</option>
+                                    <?php if (hasOwnerAccess($currentUser)): ?>
+                                        <option value="owner" <?= (string)$formData['role'] === 'owner' ? 'selected' : '' ?>>Owner</option>
+                                        <option value="manager" <?= (string)$formData['role'] === 'manager' ? 'selected' : '' ?>>Manager</option>
                                     <?php endif; ?>
                                     <option value="staff" <?= (string)$formData['role'] === 'staff' ? 'selected' : '' ?>>Staff</option>
                                     <option value="sales" <?= (string)$formData['role'] === 'sales' ? 'selected' : '' ?>>Sales</option>
@@ -382,6 +394,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [] && (string)($_POST['
                     <div class="auth-note">
                         <strong>Role saat ini:</strong>
                         <ul>
+                            <li><strong>Owner</strong> dan <strong>Manager</strong>: akses penuh untuk kelola user, nota, arsip, dan hapus permanen.</li>
                             <li><strong>Staff</strong>: fokus untuk input pembayaran dan arsipkan nota, tanpa input nota baru.</li>
                             <li><strong>Sales</strong>: fokus input nota baru dengan nama sales diisi manual.</li>
                             <li><strong>Gudang</strong>: hanya fokus mengisi nama pengirim dari daftar nota.</li>

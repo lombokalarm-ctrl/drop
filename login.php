@@ -52,7 +52,7 @@ $flash = getFlash();
         <section class="card auth-card">
             <p class="eyebrow">Akses Aplikasi</p>
             <h1>Login Nota Dropping</h1>
-            <p class="hero-text">Masuk dengan akun staff, sales, atau gudang sesuai tugas masing-masing.</p>
+            <p class="hero-text">Masuk dengan akun owner, manager, staff, sales, atau gudang sesuai tugas masing-masing.</p>
 
             <?php if ($flash): ?>
                 <div class="flash <?= htmlspecialchars($flash['type'], ENT_QUOTES, 'UTF-8') ?>">

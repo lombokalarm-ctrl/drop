@@ -156,6 +156,7 @@ function initializeDatabase(PDO $pdo): void
     $driver = (string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
 
     createUsersTable($pdo, $driver);
+    synchronizeUsersTable($pdo, $driver);
     createNotaDroppingTable($pdo, $driver);
     synchronizeLegacyColumns($pdo, $driver);
     normalizeUserRoles($pdo);
@@ -196,6 +197,49 @@ function createUsersTable(PDO $pdo, string $driver): void
             updated_at TEXT NOT NULL
         )"
     );
+}
+
+function synchronizeUsersTable(PDO $pdo, string $driver): void
+{
+    if ($driver !== 'sqlite') {
+        return;
+    }
+
+    $schemaSql = (string)$pdo->query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'")->fetchColumn();
+    if ($schemaSql === '' || !str_contains(strtolower($schemaSql), 'check(role in')) {
+        return;
+    }
+
+    $pdo->beginTransaction();
+
+    try {
+        $pdo->exec('ALTER TABLE users RENAME TO users_legacy');
+        $pdo->exec(
+            "CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                full_name TEXT NOT NULL,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )"
+        );
+        $pdo->exec(
+            "INSERT INTO users (id, full_name, username, password_hash, role, is_active, created_at, updated_at)
+            SELECT id, full_name, username, password_hash, role, is_active, created_at, updated_at
+            FROM users_legacy"
+        );
+        $pdo->exec('DROP TABLE users_legacy');
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        throw $exception;
+    }
 }
 
 function createNotaDroppingTable(PDO $pdo, string $driver): void
@@ -329,6 +373,11 @@ function normalizeUserRoles(PDO $pdo): void
     $pdo->exec("UPDATE users SET role = 'staff' WHERE role = 'admin'");
 }
 
+function hasOwnerAccess(array $user): bool
+{
+    return in_array((string)($user['role'] ?? ''), ['owner', 'manager'], true);
+}
+
 function seedDefaultUsers(PDO $pdo): void
 {
     $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');
@@ -347,6 +396,11 @@ function seedDefaultUsers(PDO $pdo): void
             'full_name' => 'Gudang',
             'username' => 'gudang',
             'role' => 'gudang',
+        ],
+        [
+            'full_name' => 'Manager',
+            'username' => 'manager',
+            'role' => 'manager',
         ],
     ];
 
@@ -533,6 +587,7 @@ function roleLabel(string $role): string
 {
     return match ($role) {
         'owner' => 'Owner',
+        'manager' => 'Manager',
         'admin', 'staff' => 'Staff',
         'sales' => 'Sales',
         'gudang' => 'Gudang',
@@ -542,22 +597,22 @@ function roleLabel(string $role): string
 
 function canManageUsers(array $user): bool
 {
-    return $user['role'] === 'owner';
+    return hasOwnerAccess($user);
 }
 
 function canViewArchive(array $user): bool
 {
-    return in_array($user['role'], ['owner', 'staff'], true);
+    return in_array($user['role'], ['owner', 'manager', 'staff'], true);
 }
 
 function canDeletePermanent(array $user): bool
 {
-    return $user['role'] === 'owner';
+    return hasOwnerAccess($user);
 }
 
 function canArchiveNote(array $user, array $note): bool
 {
-    if (in_array($user['role'], ['owner', 'staff'], true)) {
+    if (in_array($user['role'], ['owner', 'manager', 'staff'], true)) {
         return true;
     }
 
@@ -566,12 +621,12 @@ function canArchiveNote(array $user, array $note): bool
 
 function canEditNote(array $user, array $note): bool
 {
-    return $user['role'] === 'owner';
+    return hasOwnerAccess($user);
 }
 
 function canPayNote(array $user, array $note): bool
 {
-    if (in_array($user['role'], ['owner', 'staff'], true)) {
+    if (in_array($user['role'], ['owner', 'manager', 'staff'], true)) {
         return true;
     }
 
@@ -580,7 +635,7 @@ function canPayNote(array $user, array $note): bool
 
 function canManageSender(array $user, array $note): bool
 {
-    if (in_array($user['role'], ['owner', 'gudang'], true)) {
+    if (in_array($user['role'], ['owner', 'manager', 'gudang'], true)) {
         return true;
     }
 
@@ -589,7 +644,7 @@ function canManageSender(array $user, array $note): bool
 
 function canCreateNote(array $user): bool
 {
-    return in_array($user['role'], ['owner', 'sales'], true);
+    return in_array($user['role'], ['owner', 'manager', 'sales'], true);
 }
 
 function getUserScopeWhere(array $user, string $tableAlias = ''): array
@@ -602,9 +657,9 @@ function getUserScopeWhere(array $user, string $tableAlias = ''): array
     return ['', []];
 }
 
-function countActiveOwners(PDO $pdo, ?int $excludeUserId = null): int
+function countActivePrivilegedUsers(PDO $pdo, ?int $excludeUserId = null): int
 {
-    $sql = "SELECT COUNT(*) FROM users WHERE role = 'owner' AND is_active = 1";
+    $sql = "SELECT COUNT(*) FROM users WHERE role IN ('owner', 'manager') AND is_active = 1";
     $params = [];
     if ($excludeUserId !== null) {
         $sql .= ' AND id != :exclude_user_id';

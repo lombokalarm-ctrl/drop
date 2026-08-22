@@ -6,8 +6,8 @@ Aplikasi web sederhana berbasis PHP untuk mencatat nota dropping saat outlet bel
 
 - Input data nota dropping
 - Edit data nota
-- Login user dengan role `owner`, `admin`, dan `sales`
-- Kelola user oleh owner
+- Login user dengan role `owner`, `manager`, `staff`, `sales`, dan `gudang`
+- Kelola user oleh owner atau manager
 - Status otomatis `Lunas` atau `Masih Hutang`
 - Filter berdasarkan status bayar
 - Pencarian outlet, sales, atau pengirim
@@ -38,7 +38,7 @@ Aplikasi web sederhana berbasis PHP untuk mencatat nota dropping saat outlet bel
 5. Login awal gunakan:
    - Username: `owner`
    - Password: `owner123`
-6. Setelah login, owner bisa menambah user baru dari halaman `Kelola User`.
+6. Setelah login, owner atau manager bisa menambah user baru dari halaman `Kelola User`.
 7. Data nota akan otomatis tersimpan ke database yang dipilih di `.env`.
 8. Di browser Android, gunakan tombol `Install App` atau menu browser `Install app / Add to Home screen`.
 9. Tombol `Arsipkan` memindahkan data dari halaman utama ke halaman arsip.
@@ -105,6 +105,7 @@ Setelah migrasi selesai, aplikasi akan langsung memakai MySQL / MariaDB karena k
 - Card input nota baru tidak lagi memiliki kolom nominal bayar; pembayaran dilakukan dari tombol `Bayar` pada daftar nota.
 - Field `pengirim` tidak diisi dari form nota baru, tetapi lewat tombol `Input Pengirim` di daftar nota sesuai role yang diizinkan.
 - Role `sales` hanya bisa melihat nota miliknya dan input nota baru dengan nama sales diisi manual.
-- Role `admin` bisa mengelola nota dan melihat arsip, tetapi tidak bisa kelola user.
+- Role `manager` punya akses penuh setara owner, termasuk kelola user dan hapus permanen arsip.
+- Role `staff` bisa mengelola nota dan melihat arsip, tetapi tidak bisa kelola user.
 - Role `owner` punya akses penuh, termasuk kelola user dan hapus permanen arsip.
 - File `.env` tidak ikut masuk Git dan harus dibuat manual di server.
