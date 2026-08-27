@@ -447,18 +447,48 @@ input[data-lowercase-name] {
 }
 
 .password-field {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    position: relative;
 }
 
 .password-field input {
-    flex: 1;
+    width: 100%;
+    padding-right: 44px;
 }
 
 .password-toggle {
-    flex-shrink: 0;
-    min-width: 96px;
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transform: translateY(-50%);
+}
+
+.password-toggle:hover,
+.password-toggle:focus-visible,
+.password-toggle.is-active {
+    background: var(--surface-soft);
+    color: var(--text);
+}
+
+.password-toggle:focus-visible {
+    outline: 2px solid var(--primary-soft);
+    outline-offset: 1px;
+}
+
+.password-toggle svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
 }
 
 .pay-modal-overlay {
@@ -803,13 +833,8 @@ tbody td small {
         border-bottom-right-radius: 0;
     }
 
-    .password-field {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
     .password-toggle {
-        min-width: 0;
-        width: 100%;
+        width: 34px;
+        height: 34px;
     }
 }

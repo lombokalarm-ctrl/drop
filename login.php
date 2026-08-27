@@ -82,7 +82,11 @@ $flash = getFlash();
                         <span>Password</span>
                         <div class="password-field">
                             <input type="password" name="password" id="loginPasswordInput" autocomplete="current-password" required>
-                            <button type="button" class="btn btn-secondary btn-small password-toggle" id="toggleLoginPasswordButton" aria-controls="loginPasswordInput" aria-label="Lihat password">Lihat</button>
+                            <button type="button" class="password-toggle" id="toggleLoginPasswordButton" aria-controls="loginPasswordInput" aria-label="Lihat password" aria-pressed="false">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M12 5C6.6 5 2.1 8.3 1 12c1.1 3.7 5.6 7 11 7s9.9-3.3 11-7c-1.1-3.7-5.6-7-11-7Zm0 11.2A4.2 4.2 0 1 1 12 7.8a4.2 4.2 0 0 1 0 8.4Zm0-6.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8Z" />
+                                </svg>
+                            </button>
                         </div>
                     </label>
                 </div>
@@ -102,8 +106,9 @@ $flash = getFlash();
             toggleLoginPasswordButton.addEventListener('click', () => {
                 const nextType = loginPasswordInput.type === 'password' ? 'text' : 'password';
                 loginPasswordInput.type = nextType;
-                toggleLoginPasswordButton.textContent = nextType === 'password' ? 'Lihat' : 'Sembunyikan';
                 toggleLoginPasswordButton.setAttribute('aria-label', nextType === 'password' ? 'Lihat password' : 'Sembunyikan password');
+                toggleLoginPasswordButton.setAttribute('aria-pressed', nextType === 'text' ? 'true' : 'false');
+                toggleLoginPasswordButton.classList.toggle('is-active', nextType === 'text');
             });
         }
     </script>
