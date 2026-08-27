@@ -237,6 +237,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
             setFlash('success', 'Data pengirim berhasil disimpan.');
+            if ($redirectPage === '' && $currentUser['role'] === 'gudang') {
+                $redirectParams['keep_list'] = '1';
+            }
             redirectToIndex($redirectParams);
         }
     }
