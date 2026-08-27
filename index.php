@@ -469,7 +469,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Nota Dropping">
-    <title>Pencatatan Pembayaran Nota Dropping</title>
+    <title>Nota Dropping dan Tunai</title>
     <link rel="manifest" href="manifest.webmanifest?v=4">
     <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/icon-180.png">
@@ -480,7 +480,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
         <section class="hero card">
             <div>
                 <p class="eyebrow">Aplikasi Operasional</p>
-                <h1><?= $isArchivePage ? 'Arsip Nota Dropping' : ($isPaymentPage ? 'Status Pembayaran Nota' : 'Pencatatan Pembayaran Nota Dropping') ?></h1>
+                <h1><?= $isArchivePage ? 'Arsip Nota Dropping' : ($isPaymentPage ? 'Status Pembayaran Nota' : 'Nota Dropping dan Tunai') ?></h1>
             </div>
             <div class="hero-badges">
                 <span class="badge badge-neutral"><?= htmlspecialchars($currentUser['full_name'], ENT_QUOTES, 'UTF-8') ?></span>
@@ -547,9 +547,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
         <?php if ($isMainPage): ?>
             <section class="card pwa-mobile-menu" id="pwaMobileMenu" hidden>
-                <div>
-                    <strong>Menu Daftar Nota</strong>
-                </div>
                 <button type="button" class="btn btn-primary" id="openListViewButton">Daftar Nota</button>
             </section>
         <?php endif; ?>
@@ -601,7 +598,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
                         <div class="field-grid">
                             <label>
-                                <span>Tanggal Pembuatan</span>
+                                <span>Tanggal</span>
                                 <input type="text" value="<?= htmlspecialchars(formatDateId((string)$formData['created_at']), ENT_QUOTES, 'UTF-8') ?>" readonly>
                             </label>
 
@@ -837,7 +834,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                             </label>
 
                             <label>
-                                <span>Tanggal Pembuatan</span>
+                                <span>Tanggal</span>
                                 <input type="text" id="payModalCreatedAt" value="<?= htmlspecialchars($payData ? formatDateId($payData['created_at']) : '', ENT_QUOTES, 'UTF-8') ?>" readonly>
                             </label>
 
@@ -904,7 +901,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                             </label>
 
                             <label>
-                                <span>Tanggal Pembuatan</span>
+                                <span>Tanggal</span>
                                 <input type="text" id="editPaymentModalCreatedAt" value="<?= htmlspecialchars($editPaymentData ? formatDateId($editPaymentData['created_at']) : '', ENT_QUOTES, 'UTF-8') ?>" readonly>
                             </label>
 
@@ -1371,7 +1368,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
         };
 
         if (isStandalone && installHint) {
-            installHint.textContent = 'Aplikasi sudah terpasang di perangkat ini.';
+            installHint.textContent = '';
+            installHint.hidden = true;
         }
 
         window.addEventListener('beforeinstallprompt', (event) => {
