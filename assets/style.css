@@ -473,22 +473,47 @@ input[data-lowercase-name] {
     transform: translateY(-50%);
 }
 
-.password-toggle:hover,
-.password-toggle:focus-visible,
-.password-toggle.is-active {
-    background: var(--surface-soft);
-    color: var(--text);
-}
-
 .password-toggle:focus-visible {
     outline: 2px solid var(--primary-soft);
     outline-offset: 1px;
 }
 
-.password-toggle svg {
-    width: 18px;
-    height: 18px;
-    fill: currentColor;
+.password-toggle:hover,
+.password-toggle.is-active {
+    color: var(--text);
+}
+
+.password-toggle-eye {
+    position: relative;
+    display: inline-block;
+    width: 16px;
+    height: 10px;
+    border: 1.7px solid currentColor;
+    border-radius: 100% / 85%;
+}
+
+.password-toggle-eye::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4px;
+    height: 4px;
+    background: currentColor;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.password-toggle.is-active .password-toggle-eye::after {
+    content: "";
+    position: absolute;
+    top: -3px;
+    left: 7px;
+    width: 1.7px;
+    height: 15px;
+    background: currentColor;
+    border-radius: 999px;
+    transform: rotate(45deg);
 }
 
 .pay-modal-overlay {
