@@ -553,31 +553,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 
         <div class="layout">
             <section class="card form-card">
-                <div class="section-head">
-                    <h2>
-                        <?php if ($isArchivePage): ?>
-                            Info Arsip
-                        <?php elseif ($isPaymentPage): ?>
-                            Ringkasan Pembayaran
-                        <?php else: ?>
-                            <?= (int)$formData['id'] > 0 ? 'Edit Nota' : 'Input Nota Baru' ?>
+                <?php if ($isMainPage): ?>
+                    <div class="section-head">
+                        <h2><?= (int)$formData['id'] > 0 ? 'Edit Nota' : 'Input Nota Baru' ?></h2>
+                        <?php if ((int)$formData['id'] > 0): ?>
+                            <a class="text-link" href="index.php">Batal edit</a>
                         <?php endif; ?>
-                    </h2>
-                    <?php if ($isMainPage && (int)$formData['id'] > 0): ?>
-                        <a class="text-link" href="index.php">Batal edit</a>
-                    <?php endif; ?>
-                </div>
+                    </div>
+                <?php endif; ?>
 
                 <?php if ($isArchivePage): ?>
                     <div class="archive-panel">
-                        <p>Data yang diarsipkan tidak tampil lagi di halaman utama.</p>
-                        <p>Gunakan tombol <strong>Hapus Permanen</strong> hanya untuk data yang benar-benar sudah tidak dibutuhkan.</p>
                         <a class="btn btn-secondary" href="index.php">Kembali ke Halaman Utama</a>
                     </div>
                 <?php elseif ($isPaymentPage): ?>
                     <div class="archive-panel">
-                        <p>Halaman ini difokuskan untuk melihat progres pembayaran setiap nota.</p>
-                        <p>Gunakan tombol <strong>Bayar</strong> untuk menambah pembayaran atau <strong>Edit Pembayaran</strong> untuk mengoreksi total pembayaran yang sudah tercatat.</p>
                         <a class="btn btn-secondary" href="index.php">Kembali ke Input Nota</a>
                     </div>
                 <?php elseif (!canCreateNote($currentUser)): ?>
