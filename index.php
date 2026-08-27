@@ -6,6 +6,7 @@ require __DIR__ . '/bootstrap.php';
 $errors = [];
 $currentUser = requireLogin($pdo);
 $currentPage = (string)($_GET['page'] ?? '');
+$keepListOpen = (string)($_GET['keep_list'] ?? '') === '1';
 $isArchivePage = $currentPage === 'arsip';
 $isPaymentPage = $currentPage === 'pembayaran';
 $isMainPage = !$isArchivePage && !$isPaymentPage;
@@ -154,6 +155,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
             setFlash('success', 'Pembayaran nota berhasil dicatat.');
+            if ($redirectPage === '' && $currentUser['role'] === 'staff') {
+                $redirectParams['keep_list'] = '1';
+            }
             redirectToIndex($redirectParams);
         }
     }
@@ -475,7 +479,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
     <link rel="apple-touch-icon" href="assets/icon-180.png">
     <link rel="stylesheet" href="assets/style.css">
 </head>
-<body data-page="<?= $isArchivePage ? 'arsip' : ($isPaymentPage ? 'pembayaran' : 'utama') ?>">
+<body data-page="<?= $isArchivePage ? 'arsip' : ($isPaymentPage ? 'pembayaran' : 'utama') ?>" data-keep-list-open="<?= $keepListOpen ? 'true' : 'false' ?>">
     <main class="page">
         <section class="hero card">
             <div>
@@ -572,10 +576,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                     </div>
                 <?php elseif (!canCreateNote($currentUser)): ?>
                     <div class="archive-panel">
-                        <?php if ($currentUser['role'] === 'staff'): ?>
-                            <p>Role Anda difokuskan untuk proses pembayaran dan pengarsipan nota.</p>
-                            <p>Gunakan tombol <strong>Bayar</strong> dan <strong>Arsipkan</strong> di daftar nota. Input nota baru tidak tersedia untuk role ini.</p>
-                        <?php endif; ?>
                     </div>
                 <?php else: ?>
                     <form method="post" class="nota-form">
@@ -1334,6 +1334,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
         const closeListViewButton = document.getElementById('closeListViewButton');
         const isArchivePage = document.body.dataset.page === 'arsip';
         const isPaymentPage = document.body.dataset.page === 'pembayaran';
+        const shouldKeepListOpen = document.body.dataset.keepListOpen === 'true';
         let deferredInstallPrompt = null;
 
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -1427,6 +1428,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
         }
 
         syncPwaMobileListMode();
+
+        if (shouldKeepListOpen && document.body.classList.contains('pwa-mobile-mode')) {
+            document.body.classList.add('pwa-list-open');
+
+            if (window.history && typeof window.history.replaceState === 'function') {
+                const nextUrl = new URL(window.location.href);
+                nextUrl.searchParams.delete('keep_list');
+                window.history.replaceState({}, document.title, nextUrl.toString());
+            }
+        }
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
