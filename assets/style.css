@@ -690,6 +690,10 @@ tbody td small {
         font-size: 13px;
     }
 
+    .form-card .field-grid select {
+        font-size: 10px;
+    }
+
     .pay-modal .field-grid {
         grid-template-columns: 1fr;
         gap: 8px;
