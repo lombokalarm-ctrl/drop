@@ -709,10 +709,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                             <?php else: ?>
                                 <?php foreach ($rows as $row): ?>
                                     <?php $remainingAmount = getRemainingAmount((int)$row['invoice_value'], (int)$row['payment_amount']); ?>
+                                    <?php $outletLabel = $row['outlet_name'] . ' (' . $row['outlet_code'] . ')'; ?>
+                                    <?php $deleteConfirmMessage = 'Hapus permanen data arsip outlet ' . $outletLabel . '?'; ?>
+                                    <?php $archiveConfirmMessage = 'Arsipkan data nota outlet ' . $outletLabel . '?'; ?>
                                     <tr>
                                         <td><?= formatDateId($row['created_at']) ?></td>
                                         <td>
-                                            <?= htmlspecialchars($row['outlet_name'] . ' (' . $row['outlet_code'] . ')', ENT_QUOTES, 'UTF-8') ?>
+                                            <?= htmlspecialchars($outletLabel, ENT_QUOTES, 'UTF-8') ?>
                                         </td>
                                         <td><?= htmlspecialchars($row['note_category'] !== '' ? (string)$row['note_category'] : '-', ENT_QUOTES, 'UTF-8') ?></td>
                                         <td><?= htmlspecialchars((string)$row['invoice_date'], ENT_QUOTES, 'UTF-8') ?></td>
@@ -735,7 +738,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                             <div class="action-group">
                                                 <?php if ($isArchivePage): ?>
                                                     <?php if (canDeletePermanent($currentUser)): ?>
-                                                        <form method="post" onsubmit="return confirm('Hapus permanen data arsip ini?');">
+                                                        <form method="post" onsubmit="return confirm(<?= htmlspecialchars(json_encode($deleteConfirmMessage, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>);">
                                                             <input type="hidden" name="action" value="delete_permanent">
                                                             <input type="hidden" name="page" value="arsip">
                                                             <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
@@ -786,7 +789,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                                             type="button"
                                                             class="btn btn-small btn-secondary js-open-sender-modal"
                                                             data-id="<?= (int)$row['id'] ?>"
-                                                            data-outlet="<?= htmlspecialchars($row['outlet_name'] . ' (' . $row['outlet_code'] . ')', ENT_QUOTES, 'UTF-8') ?>"
+                                                            data-outlet="<?= htmlspecialchars($outletLabel, ENT_QUOTES, 'UTF-8') ?>"
                                                             data-invoice-date="<?= htmlspecialchars((string)$row['invoice_date'], ENT_QUOTES, 'UTF-8') ?>"
                                                             data-sales-name="<?= htmlspecialchars($row['sales_name'], ENT_QUOTES, 'UTF-8') ?>"
                                                             data-sender-name="<?= htmlspecialchars($row['sender_name'], ENT_QUOTES, 'UTF-8') ?>"
@@ -795,7 +798,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                                         </button>
                                                     <?php endif; ?>
                                                     <?php if (canArchiveNote($currentUser, $row)): ?>
-                                                        <form method="post" onsubmit="return confirm('Arsipkan data nota ini?');">
+                                                        <form method="post" onsubmit="return confirm(<?= htmlspecialchars(json_encode($archiveConfirmMessage, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>);">
                                                             <input type="hidden" name="action" value="archive">
                                                             <input type="hidden" name="page" value="">
                                                             <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
