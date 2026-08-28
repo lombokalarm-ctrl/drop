@@ -24,6 +24,7 @@ $editPaymentFormData = [
 $senderFormData = [
     'sender_name' => '',
 ];
+$noteCategoryOptions = getNoteCategoryOptions();
 
 if ($isArchivePage && !canViewArchive($currentUser)) {
     setFlash('error', 'Role Anda tidak memiliki akses ke halaman arsip.');
@@ -254,6 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $existingData = $id > 0 ? findNota($pdo, $id) : null;
         $outletCode = trim((string)($_POST['outlet_code'] ?? ''));
         $outletName = normalizeLowercaseName((string)($_POST['outlet_name'] ?? ''));
+        $noteCategory = normalizeNoteCategory((string)($_POST['note_category'] ?? ''));
         $invoiceDate = trim((string)($_POST['invoice_date'] ?? ''));
         $invoiceValue = (int)preg_replace('/\D+/', '', (string)($_POST['invoice_value'] ?? '0'));
         $salesName = normalizeLowercaseName((string)($_POST['sales_name'] ?? ''));
@@ -269,6 +271,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($outletName === '') {
             $errors[] = 'Nama outlet wajib diisi.';
+        }
+        if ($noteCategory === '') {
+            $errors[] = 'Keterangan wajib dipilih.';
         }
         if ($invoiceDate === '') {
             $errors[] = 'Tanggal nota wajib diisi.';
@@ -293,6 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'UPDATE nota_dropping
                     SET outlet_code = :outlet_code,
                         outlet_name = :outlet_name,
+                        note_category = :note_category,
                         invoice_date = :invoice_date,
                         invoice_value = :invoice_value,
                         payment_amount = :payment_amount,
@@ -307,6 +313,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'id' => $id,
                     'outlet_code' => $outletCode,
                     'outlet_name' => $outletName,
+                    'note_category' => $noteCategory,
                     'invoice_date' => $invoiceDate,
                     'invoice_value' => $invoiceValue,
                     'payment_amount' => $paymentAmount,
@@ -323,6 +330,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'INSERT INTO nota_dropping (
                         outlet_code,
                         outlet_name,
+                        note_category,
                         invoice_date,
                         invoice_value,
                         payment_amount,
@@ -336,6 +344,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ) VALUES (
                         :outlet_code,
                         :outlet_name,
+                        :note_category,
                         :invoice_date,
                         :invoice_value,
                         :payment_amount,
@@ -351,6 +360,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $statement->execute([
                     'outlet_code' => $outletCode,
                     'outlet_name' => $outletName,
+                    'note_category' => $noteCategory,
                     'invoice_date' => $invoiceDate,
                     'invoice_value' => $invoiceValue,
                     'payment_amount' => $paymentAmount,
@@ -435,6 +445,7 @@ $formData = $editData ?? [
     'id' => 0,
     'outlet_code' => '',
     'outlet_name' => '',
+    'note_category' => '',
     'invoice_date' => '',
     'created_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
     'invoice_value' => '',
@@ -450,6 +461,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             'id' => (int)($_POST['id'] ?? 0),
             'outlet_code' => $_POST['outlet_code'] ?? '',
             'outlet_name' => normalizeLowercaseName((string)($_POST['outlet_name'] ?? '')),
+            'note_category' => normalizeNoteCategory((string)($_POST['note_category'] ?? '')),
             'invoice_date' => $_POST['invoice_date'] ?? '',
             'created_at' => $_POST['created_at'] ?? (new DateTimeImmutable())->format('Y-m-d H:i:s'),
             'invoice_value' => preg_replace('/\D+/', '', (string)($_POST['invoice_value'] ?? '')),
@@ -616,6 +628,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                 <span>Nilai Nota</span>
                                 <input type="text" name="invoice_value" data-currency data-role="invoice-value" value="<?= htmlspecialchars((string)$formData['invoice_value'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Contoh: 1250000" inputmode="numeric" required>
                             </label>
+
+                            <label>
+                                <span>Keterangan</span>
+                                <select name="note_category" required>
+                                    <option value="">Pilih keterangan</option>
+                                    <?php foreach ($noteCategoryOptions as $noteCategoryValue => $noteCategoryLabel): ?>
+                                        <option value="<?= htmlspecialchars($noteCategoryValue, ENT_QUOTES, 'UTF-8') ?>" <?= (string)$formData['note_category'] === $noteCategoryValue ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($noteCategoryLabel, ENT_QUOTES, 'UTF-8') ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
                         </div>
 
                         <div class="form-actions">
@@ -659,6 +683,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                             <tr>
                                 <th>Dibuat</th>
                                 <th>Outlet</th>
+                                <th>Ket.</th>
                                 <th>Tanggal Nota</th>
                                 <?php if ($isArchivePage): ?>
                                     <th>Diarsipkan</th>
@@ -677,7 +702,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                         <tbody>
                             <?php if ($rows === []): ?>
                                 <tr>
-                                    <td colspan="<?= $isArchivePage ? '10' : ($isPaymentPage ? '10' : '9') ?>" class="empty-state">
+                                    <td colspan="<?= $isArchivePage ? '11' : ($isPaymentPage ? '11' : '10') ?>" class="empty-state">
                                         <?= $isArchivePage ? 'Belum ada data arsip nota dropping.' : ($isPaymentPage ? 'Belum ada data status pembayaran.' : 'Belum ada data nota dropping.') ?>
                                     </td>
                                 </tr>
@@ -689,6 +714,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                                         <td>
                                             <?= htmlspecialchars($row['outlet_name'] . ' (' . $row['outlet_code'] . ')', ENT_QUOTES, 'UTF-8') ?>
                                         </td>
+                                        <td><?= htmlspecialchars($row['note_category'] !== '' ? (string)$row['note_category'] : '-', ENT_QUOTES, 'UTF-8') ?></td>
                                         <td><?= htmlspecialchars((string)$row['invoice_date'], ENT_QUOTES, 'UTF-8') ?></td>
                                         <?php if ($isArchivePage): ?>
                                             <td><?= formatDateTimeId($row['archived_at']) ?></td>

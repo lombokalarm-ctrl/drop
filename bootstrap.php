@@ -250,6 +250,7 @@ function createNotaDroppingTable(PDO $pdo, string $driver): void
                 id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
                 outlet_code VARCHAR(50) NOT NULL,
                 outlet_name VARCHAR(180) NOT NULL,
+                note_category VARCHAR(10) NOT NULL DEFAULT '',
                 invoice_date VARCHAR(100) NOT NULL,
                 invoice_value BIGINT UNSIGNED NOT NULL,
                 payment_amount BIGINT UNSIGNED NOT NULL DEFAULT 0,
@@ -276,6 +277,7 @@ function createNotaDroppingTable(PDO $pdo, string $driver): void
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             outlet_code TEXT NOT NULL,
             outlet_name TEXT NOT NULL,
+            note_category TEXT NOT NULL DEFAULT '',
             invoice_date TEXT NOT NULL,
             invoice_value INTEGER NOT NULL,
             payment_amount INTEGER NOT NULL DEFAULT 0,
@@ -294,6 +296,12 @@ function createNotaDroppingTable(PDO $pdo, string $driver): void
 function synchronizeLegacyColumns(PDO $pdo, string $driver): void
 {
     $noteColumns = getTableColumns($pdo, 'nota_dropping');
+
+    if (!in_array('note_category', $noteColumns, true)) {
+        $pdo->exec($driver === 'mysql'
+            ? "ALTER TABLE nota_dropping ADD COLUMN note_category VARCHAR(10) NOT NULL DEFAULT ''"
+            : "ALTER TABLE nota_dropping ADD COLUMN note_category TEXT NOT NULL DEFAULT ''");
+    }
 
     if (!in_array('payment_amount', $noteColumns, true)) {
         $pdo->exec($driver === 'mysql'
@@ -530,6 +538,24 @@ function normalizeLowercaseName(?string $value): string
     }
 
     return strtolower($normalized);
+}
+
+function getNoteCategoryOptions(): array
+{
+    return [
+        'D' => 'Dropping (D)',
+        'T' => 'Tunai (T)',
+        'BB' => 'Bawa Barang (BB)',
+        'BN' => 'Bawa Nota (BN)',
+    ];
+}
+
+function normalizeNoteCategory(?string $value): string
+{
+    $normalized = strtoupper(trim((string)$value));
+    $options = getNoteCategoryOptions();
+
+    return array_key_exists($normalized, $options) ? $normalized : '';
 }
 
 function calculatePaymentStatus(int $invoiceValue, int $paymentAmount): string
