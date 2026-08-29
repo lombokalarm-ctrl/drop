@@ -389,15 +389,15 @@ $filters = [
     'created_until' => trim((string)($_GET['created_until'] ?? '')),
 ];
 $filterErrors = [];
-$createdFromFilter = parseIsoDateInput($filters['created_from']);
-$createdUntilFilter = parseIsoDateInput($filters['created_until']);
+$createdFromFilter = parseDateIdInput($filters['created_from']);
+$createdUntilFilter = parseDateIdInput($filters['created_until']);
 
 if ($filters['created_from'] !== '' && $createdFromFilter === null) {
-    $filterErrors[] = 'Tanggal mulai harus memakai format YYYY-MM-DD.';
+    $filterErrors[] = 'Tanggal mulai harus memakai format DD-MM-YYYY.';
 }
 
 if ($filters['created_until'] !== '' && $createdUntilFilter === null) {
-    $filterErrors[] = 'Tanggal akhir harus memakai format YYYY-MM-DD.';
+    $filterErrors[] = 'Tanggal akhir harus memakai format DD-MM-YYYY.';
 }
 
 if ($createdFromFilter !== null && $createdUntilFilter !== null && $createdFromFilter > $createdUntilFilter) {
@@ -852,17 +852,21 @@ if ($isPrintMode) {
                     <?php elseif ($isPaymentPage): ?>
                         <input type="hidden" name="page" value="pembayaran">
                     <?php endif; ?>
-                    <input type="search" name="q" value="<?= htmlspecialchars($filters['q'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Cari outlet, sales, pengirim">
-                    <select name="status">
+                    <input type="search" name="q" value="<?= htmlspecialchars($filters['q'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Cari outlet, sales, pengirim" class="filter-search">
+                    <select name="status" class="filter-status">
                         <option value="">Semua Status</option>
                         <option value="belum_bayar" <?= $filters['status'] === 'belum_bayar' ? 'selected' : '' ?>>Masih Hutang</option>
                         <option value="sudah_bayar" <?= $filters['status'] === 'sudah_bayar' ? 'selected' : '' ?>>Lunas</option>
                     </select>
-                    <input type="text" name="created_from" value="<?= htmlspecialchars($filters['created_from'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Dari tanggal buat YYYY-MM-DD" inputmode="numeric">
-                    <input type="text" name="created_until" value="<?= htmlspecialchars($filters['created_until'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Sampai tanggal buat YYYY-MM-DD" inputmode="numeric">
-                    <button type="submit" class="btn btn-primary">Filter</button>
-                    <a href="<?= $isArchivePage ? 'index.php?page=arsip' : ($isPaymentPage ? 'index.php?page=pembayaran' : 'index.php') ?>" class="btn btn-secondary">Reset</a>
-                    <a href="<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary" target="_blank" rel="noopener">Print</a>
+                    <div class="filter-date-range">
+                        <input type="text" name="created_from" value="<?= htmlspecialchars($filters['created_from'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Dari DD-MM-YYYY" inputmode="numeric">
+                        <input type="text" name="created_until" value="<?= htmlspecialchars($filters['created_until'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Sampai DD-MM-YYYY" inputmode="numeric">
+                    </div>
+                    <div class="filter-actions-row">
+                        <button type="submit" class="btn btn-primary">Filter</button>
+                        <a href="<?= $isArchivePage ? 'index.php?page=arsip' : ($isPaymentPage ? 'index.php?page=pembayaran' : 'index.php') ?>" class="btn btn-secondary">Reset</a>
+                        <a href="<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary" target="_blank" rel="noopener">Print</a>
+                    </div>
                 </form>
 
                 <div class="table-wrap">
