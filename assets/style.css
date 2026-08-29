@@ -388,7 +388,7 @@ input[data-lowercase-name] {
 }
 
 .filter-bar {
-    grid-template-columns: minmax(200px, 1fr) 180px auto auto;
+    grid-template-columns: minmax(200px, 1fr) 160px 190px 190px auto auto auto;
     margin-bottom: 12px;
 }
 
@@ -627,6 +627,121 @@ tbody td small {
     text-align: center;
     color: var(--muted);
     padding: 30px 16px;
+}
+
+body.print-mode {
+    background: #ffffff;
+}
+
+.print-sheet {
+    padding: 18px;
+}
+
+.print-sheet-head {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.print-sheet-head h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.print-sheet-head p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.print-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.print-table-wrap {
+    border-radius: 0;
+    overflow: visible;
+}
+
+.print-table {
+    width: 100%;
+    min-width: 0;
+}
+
+.print-table thead th {
+    position: static;
+    padding: 9px 10px;
+    font-size: 11px;
+}
+
+.print-table tbody td {
+    padding: 8px 10px;
+    font-size: 11px;
+    white-space: normal;
+}
+
+.print-table tbody tr:hover {
+    background: transparent;
+}
+
+.print-date-row td {
+    padding: 10px 12px;
+    font-weight: 700;
+    color: #32415f;
+    background: #f5f8ff;
+    border-top: 2px solid #9cb3df;
+    border-bottom: 2px solid #9cb3df;
+}
+
+.print-number-cell {
+    text-align: right;
+}
+
+@page {
+    size: A4 landscape;
+    margin: 10mm;
+}
+
+@media print {
+    body {
+        background: #ffffff;
+        color: #000000;
+        font-size: 11px;
+    }
+
+    .page {
+        max-width: none;
+        padding: 0;
+    }
+
+    body.print-mode .hero {
+        display: none;
+    }
+
+    body.print-mode .print-sheet {
+        padding: 0;
+        border: 0;
+        box-shadow: none;
+    }
+
+    body.print-mode .print-table-wrap {
+        border: 0;
+    }
+
+    body.print-mode .print-table thead th,
+    body.print-mode .print-table tbody td {
+        padding: 6px 8px;
+    }
+
+    body.print-mode .print-table tbody tr,
+    body.print-mode .print-date-row {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
 }
 
 @media (max-width: 1080px) {

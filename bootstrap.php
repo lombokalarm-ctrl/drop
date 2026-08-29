@@ -505,6 +505,26 @@ function parseDateIdInput(?string $date): ?string
     return $dateTime->format('Y-m-d');
 }
 
+function parseIsoDateInput(?string $date): ?string
+{
+    $value = trim((string)$date);
+    if ($value === '') {
+        return null;
+    }
+
+    $dateTime = DateTimeImmutable::createFromFormat('Y-m-d', $value);
+    $errors = DateTimeImmutable::getLastErrors();
+
+    if (
+        $dateTime === false
+        || ($errors !== false && (($errors['warning_count'] ?? 0) > 0 || ($errors['error_count'] ?? 0) > 0))
+    ) {
+        return null;
+    }
+
+    return $dateTime->format('Y-m-d');
+}
+
 function formatDateTimeId(?string $dateTime): string
 {
     if (!$dateTime) {

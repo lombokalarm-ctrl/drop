@@ -6,6 +6,7 @@ require __DIR__ . '/bootstrap.php';
 $errors = [];
 $currentUser = requireLogin($pdo);
 $currentPage = (string)($_GET['page'] ?? '');
+$isPrintMode = (string)($_GET['print'] ?? '') === '1';
 $keepListOpen = (string)($_GET['keep_list'] ?? '') === '1';
 $isArchivePage = $currentPage === 'arsip';
 $isPaymentPage = $currentPage === 'pembayaran';
@@ -384,7 +385,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $filters = [
     'q' => trim((string)($_GET['q'] ?? '')),
     'status' => (string)($_GET['status'] ?? ''),
+    'created_from' => trim((string)($_GET['created_from'] ?? '')),
+    'created_until' => trim((string)($_GET['created_until'] ?? '')),
 ];
+$filterErrors = [];
+$createdFromFilter = parseIsoDateInput($filters['created_from']);
+$createdUntilFilter = parseIsoDateInput($filters['created_until']);
+
+if ($filters['created_from'] !== '' && $createdFromFilter === null) {
+    $filterErrors[] = 'Tanggal mulai harus memakai format YYYY-MM-DD.';
+}
+
+if ($filters['created_until'] !== '' && $createdUntilFilter === null) {
+    $filterErrors[] = 'Tanggal akhir harus memakai format YYYY-MM-DD.';
+}
+
+if ($createdFromFilter !== null && $createdUntilFilter !== null && $createdFromFilter > $createdUntilFilter) {
+    $filterErrors[] = 'Tanggal mulai tidak boleh melebihi tanggal akhir.';
+    $createdFromFilter = null;
+    $createdUntilFilter = null;
+}
 
 $where = [];
 $params = [];
@@ -408,13 +428,27 @@ if ($filters['status'] === 'belum_bayar') {
     $where[] = 'payment_amount >= invoice_value';
 }
 
+if ($createdFromFilter !== null) {
+    $where[] = 'created_at >= :created_from';
+    $params['created_from'] = $createdFromFilter . ' 00:00:00';
+}
+
+if ($createdUntilFilter !== null) {
+    $where[] = 'created_at <= :created_until';
+    $params['created_until'] = $createdUntilFilter . ' 23:59:59';
+}
+
 $sql = 'SELECT * FROM nota_dropping';
 if ($where !== []) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }
-$sql .= $isArchivePage
-    ? ' ORDER BY archived_at DESC, updated_at DESC, id DESC'
-    : ' ORDER BY created_at DESC, id DESC';
+if ($isPrintMode) {
+    $sql .= ' ORDER BY created_at ASC, id ASC';
+} else {
+    $sql .= $isArchivePage
+        ? ' ORDER BY archived_at DESC, updated_at DESC, id DESC'
+        : ' ORDER BY created_at DESC, id DESC';
+}
 
 $statement = $pdo->prepare($sql);
 $statement->execute($params);
@@ -425,6 +459,14 @@ $summaryParams = [];
 if ($scopeWhere !== '') {
     $summaryWhereParts[] = $scopeWhere;
     $summaryParams = array_merge($summaryParams, $scopeParams);
+}
+if ($createdFromFilter !== null) {
+    $summaryWhereParts[] = 'created_at >= :created_from';
+    $summaryParams['created_from'] = $createdFromFilter . ' 00:00:00';
+}
+if ($createdUntilFilter !== null) {
+    $summaryWhereParts[] = 'created_at <= :created_until';
+    $summaryParams['created_until'] = $createdUntilFilter . ' 23:59:59';
 }
 $summaryStatement = $pdo->prepare(
     'SELECT
@@ -477,6 +519,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
         ];
     }
 }
+
+$listTitle = $isArchivePage ? 'Daftar Arsip Nota' : ($isPaymentPage ? 'Status Pembayaran' : 'Daftar Nota');
+$printTitle = $isArchivePage ? 'Cetak Arsip Nota' : ($isPaymentPage ? 'Cetak Status Pembayaran' : 'Cetak Daftar Nota');
+$printBaseParams = [];
+
+if ($currentPage !== '') {
+    $printBaseParams['page'] = $currentPage;
+}
+if ($filters['q'] !== '') {
+    $printBaseParams['q'] = $filters['q'];
+}
+if ($filters['status'] !== '') {
+    $printBaseParams['status'] = $filters['status'];
+}
+if ($filters['created_from'] !== '') {
+    $printBaseParams['created_from'] = $filters['created_from'];
+}
+if ($filters['created_until'] !== '') {
+    $printBaseParams['created_until'] = $filters['created_until'];
+}
+
+$printUrl = 'index.php?' . http_build_query(array_merge($printBaseParams, ['print' => '1']));
+$backFromPrintUrl = 'index.php' . ($printBaseParams !== [] ? '?' . http_build_query($printBaseParams) : '');
+$printRowsByDate = [];
+$printRowNumber = 1;
+$printColumnCount = 10 + ($isArchivePage ? 1 : 0) + ($isPaymentPage ? 1 : 0);
+
+if ($isPrintMode) {
+    foreach ($rows as $row) {
+        $dateGroupLabel = formatDateId((string)$row['created_at']);
+        if (!isset($printRowsByDate[$dateGroupLabel])) {
+            $printRowsByDate[$dateGroupLabel] = [];
+        }
+        $printRowsByDate[$dateGroupLabel][] = $row;
+    }
+}
 ?>
 <!doctype html>
 <html lang="id">
@@ -494,58 +572,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
     <link rel="apple-touch-icon" href="assets/icon-180.png">
     <link rel="stylesheet" href="assets/style.css">
 </head>
-<body data-page="<?= $isArchivePage ? 'arsip' : ($isPaymentPage ? 'pembayaran' : 'utama') ?>" data-keep-list-open="<?= $keepListOpen ? 'true' : 'false' ?>">
+<body class="<?= $isPrintMode ? 'print-mode' : '' ?>" data-page="<?= $isArchivePage ? 'arsip' : ($isPaymentPage ? 'pembayaran' : 'utama') ?>" data-keep-list-open="<?= $keepListOpen ? 'true' : 'false' ?>">
     <main class="page">
         <section class="hero card">
             <div>
                 <p class="eyebrow">Aplikasi Operasional</p>
-                <h1><?= $isArchivePage ? 'Arsip Nota Dropping' : ($isPaymentPage ? 'Status Pembayaran Nota' : 'Nota Dropping dan Tunai') ?></h1>
+                <h1><?= $isPrintMode ? $printTitle : ($isArchivePage ? 'Arsip Nota Dropping' : ($isPaymentPage ? 'Status Pembayaran Nota' : 'Nota Dropping dan Tunai')) ?></h1>
             </div>
             <div class="hero-badges">
-                <span class="badge badge-neutral"><?= htmlspecialchars($currentUser['full_name'], ENT_QUOTES, 'UTF-8') ?></span>
-                <?php if (canViewArchive($currentUser)): ?>
-                    <a class="badge badge-link" href="<?= $isArchivePage ? 'index.php' : 'index.php?page=arsip' ?>">
-                        <?= $isArchivePage ? 'Halaman Utama' : 'Halaman Arsip' ?>
-                    </a>
+                <?php if ($isPrintMode): ?>
+                    <span class="badge badge-neutral"><?= htmlspecialchars($currentUser['full_name'], ENT_QUOTES, 'UTF-8') ?></span>
+                    <a class="badge badge-link" href="<?= htmlspecialchars($backFromPrintUrl, ENT_QUOTES, 'UTF-8') ?>">Kembali ke Daftar</a>
+                <?php else: ?>
+                    <span class="badge badge-neutral"><?= htmlspecialchars($currentUser['full_name'], ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php if (canViewArchive($currentUser)): ?>
+                        <a class="badge badge-link" href="<?= $isArchivePage ? 'index.php' : 'index.php?page=arsip' ?>">
+                            <?= $isArchivePage ? 'Halaman Utama' : 'Halaman Arsip' ?>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (canViewPaymentStatus($currentUser)): ?>
+                        <a class="badge badge-link" href="<?= $isPaymentPage ? 'index.php' : 'index.php?page=pembayaran' ?>">
+                            <?= $isPaymentPage ? 'Input Nota' : 'Status Pembayaran' ?>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (canManageUsers($currentUser)): ?>
+                        <a class="badge badge-link" href="users.php">Kelola User</a>
+                    <?php endif; ?>
+                    <a class="badge badge-link" href="logout.php">Logout</a>
                 <?php endif; ?>
-                <?php if (canViewPaymentStatus($currentUser)): ?>
-                    <a class="badge badge-link" href="<?= $isPaymentPage ? 'index.php' : 'index.php?page=pembayaran' ?>">
-                        <?= $isPaymentPage ? 'Input Nota' : 'Status Pembayaran' ?>
-                    </a>
-                <?php endif; ?>
-                <?php if (canManageUsers($currentUser)): ?>
-                    <a class="badge badge-link" href="users.php">Kelola User</a>
-                <?php endif; ?>
-                <a class="badge badge-link" href="logout.php">Logout</a>
             </div>
             <div class="hero-actions">
-                <button type="button" class="btn btn-primary btn-install" id="installAppButton" hidden>Install App</button>
-                <p class="install-hint" id="installHint">Bisa dipasang ke layar utama Android dari browser.</p>
+                <?php if ($isPrintMode): ?>
+                    <button type="button" class="btn btn-primary" onclick="window.print()">Print Sekarang</button>
+                    <p class="install-hint">Format cetak A4 landscape dengan pemisah per tanggal pembuatan.</p>
+                <?php else: ?>
+                    <button type="button" class="btn btn-primary btn-install" id="installAppButton" hidden>Install App</button>
+                    <p class="install-hint" id="installHint">Bisa dipasang ke layar utama Android dari browser.</p>
+                <?php endif; ?>
             </div>
         </section>
 
-        <section class="summary-grid">
-            <article class="card summary-card">
-                <span class="summary-label">Total Data</span>
-                <strong><?= (int)($summary['total_data'] ?? 0) ?></strong>
-            </article>
-            <article class="card summary-card">
-                <span class="summary-label">Total Nilai Nota</span>
-                <strong><?= formatNumberId((int)($summary['total_nilai'] ?? 0)) ?></strong>
-            </article>
-            <article class="card summary-card success">
-                <span class="summary-label">Total Dibayar</span>
-                <strong><?= formatNumberId((int)($summary['total_dibayar'] ?? 0)) ?></strong>
-            </article>
-            <article class="card summary-card warning">
-                <span class="summary-label">Masih Hutang</span>
-                <strong><?= (int)($summary['total_belum_bayar'] ?? 0) ?></strong>
-            </article>
-            <article class="card summary-card danger">
-                <span class="summary-label">Outstanding</span>
-                <strong><?= formatNumberId((int)($summary['total_piutang'] ?? 0)) ?></strong>
-            </article>
-        </section>
+        <?php if (!$isPrintMode): ?>
+            <section class="summary-grid">
+                <article class="card summary-card">
+                    <span class="summary-label">Total Data</span>
+                    <strong><?= (int)($summary['total_data'] ?? 0) ?></strong>
+                </article>
+                <article class="card summary-card">
+                    <span class="summary-label">Total Nilai Nota</span>
+                    <strong><?= formatNumberId((int)($summary['total_nilai'] ?? 0)) ?></strong>
+                </article>
+                <article class="card summary-card success">
+                    <span class="summary-label">Total Dibayar</span>
+                    <strong><?= formatNumberId((int)($summary['total_dibayar'] ?? 0)) ?></strong>
+                </article>
+                <article class="card summary-card warning">
+                    <span class="summary-label">Masih Hutang</span>
+                    <strong><?= (int)($summary['total_belum_bayar'] ?? 0) ?></strong>
+                </article>
+                <article class="card summary-card danger">
+                    <span class="summary-label">Outstanding</span>
+                    <strong><?= formatNumberId((int)($summary['total_piutang'] ?? 0)) ?></strong>
+                </article>
+            </section>
+        <?php endif; ?>
 
         <?php if ($flash): ?>
             <div class="flash <?= htmlspecialchars($flash['type'], ENT_QUOTES, 'UTF-8') ?>">
@@ -564,13 +654,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
             </div>
         <?php endif; ?>
 
-        <?php if ($isMainPage): ?>
-            <section class="card pwa-mobile-menu" id="pwaMobileMenu" hidden>
-                <button type="button" class="btn btn-primary" id="openListViewButton">Daftar Nota</button>
-            </section>
+        <?php if ($filterErrors !== []): ?>
+            <div class="flash error">
+                <strong>Filter tanggal belum bisa dipakai:</strong>
+                <ul>
+                    <?php foreach ($filterErrors as $error): ?>
+                        <li><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
         <?php endif; ?>
 
-        <div class="layout">
+        <?php if ($isPrintMode): ?>
+            <section class="card print-sheet">
+                <div class="print-sheet-head">
+                    <div>
+                        <h2><?= htmlspecialchars($printTitle, ENT_QUOTES, 'UTF-8') ?></h2>
+                        <p>Urutan cetak berdasarkan tanggal pembuatan nota.</p>
+                    </div>
+                    <div class="print-meta">
+                        <span>Total data: <?= (int)count($rows) ?></span>
+                        <span>Dicetak: <?= htmlspecialchars(formatDateTimeId((new DateTimeImmutable())->format('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8') ?></span>
+                        <span>Filter status: <?= htmlspecialchars($filters['status'] === '' ? 'Semua Status' : ($filters['status'] === 'sudah_bayar' ? 'Lunas' : 'Masih Hutang'), ENT_QUOTES, 'UTF-8') ?></span>
+                        <span>Range tanggal: <?= htmlspecialchars(($filters['created_from'] !== '' || $filters['created_until'] !== '') ? (($filters['created_from'] !== '' ? $filters['created_from'] : '...') . ' s/d ' . ($filters['created_until'] !== '' ? $filters['created_until'] : '...')) : 'Semua tanggal', ENT_QUOTES, 'UTF-8') ?></span>
+                        <span>Cari: <?= htmlspecialchars($filters['q'] !== '' ? $filters['q'] : 'Semua data', ENT_QUOTES, 'UTF-8') ?></span>
+                    </div>
+                </div>
+
+                <div class="table-wrap print-table-wrap">
+                    <table class="print-table">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Waktu</th>
+                                <th>Outlet</th>
+                                <th>Ket.</th>
+                                <th>Tanggal Nota</th>
+                                <?php if ($isArchivePage): ?>
+                                    <th>Diarsipkan</th>
+                                <?php endif; ?>
+                                <th>Nilai Nota</th>
+                                <th>Dibayar</th>
+                                <th>Sisa Hutang</th>
+                                <?php if ($isPaymentPage): ?>
+                                    <th>Status</th>
+                                <?php endif; ?>
+                                <th>Sales</th>
+                                <th>Pengirim</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($rows === []): ?>
+                                <tr>
+                                    <td colspan="<?= $printColumnCount ?>" class="empty-state">Belum ada data untuk dicetak.</td>
+                                </tr>
+                            <?php else: ?>
+                                <?php foreach ($printRowsByDate as $printDateLabel => $printDateRows): ?>
+                                    <tr class="print-date-row">
+                                        <td colspan="<?= $printColumnCount ?>">
+                                            Tanggal Pembuatan: <?= htmlspecialchars($printDateLabel, ENT_QUOTES, 'UTF-8') ?>
+                                        </td>
+                                    </tr>
+                                    <?php foreach ($printDateRows as $row): ?>
+                                        <?php
+                                        $remainingAmount = getRemainingAmount((int)$row['invoice_value'], (int)$row['payment_amount']);
+                                        $outletLabel = $row['outlet_name'] . ' (' . $row['outlet_code'] . ')';
+                                        $createdAt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string)$row['created_at']);
+                                        $createdTimeLabel = $createdAt ? $createdAt->format('H:i') : '-';
+                                        ?>
+                                        <tr>
+                                            <td><?= $printRowNumber ?></td>
+                                            <td><?= htmlspecialchars($createdTimeLabel, ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><?= htmlspecialchars($outletLabel, ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><?= htmlspecialchars($row['note_category'] !== '' ? (string)$row['note_category'] : '-', ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><?= htmlspecialchars((string)$row['invoice_date'], ENT_QUOTES, 'UTF-8') ?></td>
+                                            <?php if ($isArchivePage): ?>
+                                                <td><?= htmlspecialchars(formatDateTimeId((string)$row['archived_at']), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <?php endif; ?>
+                                            <td class="print-number-cell"><?= formatNumberId((int)$row['invoice_value']) ?></td>
+                                            <td class="print-number-cell"><?= formatNumberId((int)$row['payment_amount']) ?></td>
+                                            <td class="print-number-cell"><?= formatNumberId($remainingAmount) ?></td>
+                                            <?php if ($isPaymentPage): ?>
+                                                <td><?= htmlspecialchars((string)$row['payment_status'] === 'sudah_bayar' ? 'Lunas' : 'Masih Hutang', ENT_QUOTES, 'UTF-8') ?></td>
+                                            <?php endif; ?>
+                                            <td><?= htmlspecialchars((string)$row['sales_name'], ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><?= htmlspecialchars($row['sender_name'] !== '' ? (string)$row['sender_name'] : '-', ENT_QUOTES, 'UTF-8') ?></td>
+                                        </tr>
+                                        <?php $printRowNumber++; ?>
+                                    <?php endforeach; ?>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        <?php else: ?>
+            <?php if ($isMainPage): ?>
+                <section class="card pwa-mobile-menu" id="pwaMobileMenu" hidden>
+                    <button type="button" class="btn btn-primary" id="openListViewButton">Daftar Nota</button>
+                </section>
+            <?php endif; ?>
+
+            <div class="layout">
             <section class="card form-card">
                 <?php if ($isMainPage): ?>
                     <div class="section-head">
@@ -673,8 +858,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                         <option value="belum_bayar" <?= $filters['status'] === 'belum_bayar' ? 'selected' : '' ?>>Masih Hutang</option>
                         <option value="sudah_bayar" <?= $filters['status'] === 'sudah_bayar' ? 'selected' : '' ?>>Lunas</option>
                     </select>
+                    <input type="text" name="created_from" value="<?= htmlspecialchars($filters['created_from'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Dari tanggal buat YYYY-MM-DD" inputmode="numeric">
+                    <input type="text" name="created_until" value="<?= htmlspecialchars($filters['created_until'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Sampai tanggal buat YYYY-MM-DD" inputmode="numeric">
                     <button type="submit" class="btn btn-primary">Filter</button>
                     <a href="<?= $isArchivePage ? 'index.php?page=arsip' : ($isPaymentPage ? 'index.php?page=pembayaran' : 'index.php') ?>" class="btn btn-secondary">Reset</a>
+                    <a href="<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary" target="_blank" rel="noopener">Print</a>
                 </form>
 
                 <div class="table-wrap">
@@ -815,9 +1003,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                     </table>
                 </div>
             </section>
-        </div>
+            </div>
+        <?php endif; ?>
 
-        <?php if (!$isArchivePage): ?>
+        <?php if (!$isArchivePage && !$isPrintMode): ?>
             <?php
             $modalPayment = $payData ? (int)$payData['payment_amount'] : 0;
             $modalInvoice = $payData ? (int)$payData['invoice_value'] : 0;
@@ -1469,6 +1658,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
                 nextUrl.searchParams.delete('keep_list');
                 window.history.replaceState({}, document.title, nextUrl.toString());
             }
+        }
+
+        if (document.body.classList.contains('print-mode')) {
+            window.addEventListener('load', () => {
+                window.setTimeout(() => {
+                    window.print();
+                }, 150);
+            });
         }
 
         if ('serviceWorker' in navigator) {
