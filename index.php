@@ -544,7 +544,7 @@ $printUrl = 'index.php?' . http_build_query(array_merge($printBaseParams, ['prin
 $backFromPrintUrl = 'index.php' . ($printBaseParams !== [] ? '?' . http_build_query($printBaseParams) : '');
 $printRowsByDate = [];
 $printRowNumber = 1;
-$printColumnCount = 10 + ($isArchivePage ? 1 : 0) + ($isPaymentPage ? 1 : 0);
+$printColumnCount = 9 + ($isArchivePage ? 1 : 0) + ($isPaymentPage ? 1 : 0);
 
 if ($isPrintMode) {
     foreach ($rows as $row) {
@@ -686,7 +686,6 @@ if ($isPrintMode) {
                         <thead>
                             <tr>
                                 <th>No</th>
-                                <th>Waktu</th>
                                 <th>Outlet</th>
                                 <th>Ket.</th>
                                 <th>Tanggal Nota</th>
@@ -719,12 +718,9 @@ if ($isPrintMode) {
                                         <?php
                                         $remainingAmount = getRemainingAmount((int)$row['invoice_value'], (int)$row['payment_amount']);
                                         $outletLabel = $row['outlet_name'] . ' (' . $row['outlet_code'] . ')';
-                                        $createdAt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string)$row['created_at']);
-                                        $createdTimeLabel = $createdAt ? $createdAt->format('H:i') : '-';
                                         ?>
                                         <tr>
                                             <td><?= $printRowNumber ?></td>
-                                            <td><?= htmlspecialchars($createdTimeLabel, ENT_QUOTES, 'UTF-8') ?></td>
                                             <td><?= htmlspecialchars($outletLabel, ENT_QUOTES, 'UTF-8') ?></td>
                                             <td><?= htmlspecialchars($row['note_category'] !== '' ? (string)$row['note_category'] : '-', ENT_QUOTES, 'UTF-8') ?></td>
                                             <td><?= htmlspecialchars((string)$row['invoice_date'], ENT_QUOTES, 'UTF-8') ?></td>
