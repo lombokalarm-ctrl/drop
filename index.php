@@ -848,6 +848,9 @@ if ($isPrintMode) {
                     <?php elseif ($isPaymentPage): ?>
                         <input type="hidden" name="page" value="pembayaran">
                     <?php endif; ?>
+                    <?php if ($isMainPage): ?>
+                        <input type="hidden" name="keep_list" value="1" id="keepListInput" disabled>
+                    <?php endif; ?>
                     <input type="search" name="q" value="<?= htmlspecialchars($filters['q'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Cari outlet, sales, pengirim" class="filter-search">
                     <select name="status" class="filter-status">
                         <option value="">Semua Status</option>
@@ -1553,6 +1556,8 @@ if ($isPrintMode) {
         const pwaMobileMenu = document.getElementById('pwaMobileMenu');
         const openListViewButton = document.getElementById('openListViewButton');
         const closeListViewButton = document.getElementById('closeListViewButton');
+        const filterForm = document.querySelector('.filter-bar');
+        const keepListInput = document.getElementById('keepListInput');
         const isArchivePage = document.body.dataset.page === 'arsip';
         const isPaymentPage = document.body.dataset.page === 'pembayaran';
         const shouldKeepListOpen = document.body.dataset.keepListOpen === 'true';
@@ -1561,6 +1566,16 @@ if ($isPrintMode) {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
         const mobileViewport = window.matchMedia('(max-width: 720px)');
         const landscapeViewport = window.matchMedia('(orientation: landscape)');
+        const syncKeepListInput = () => {
+            if (!keepListInput) {
+                return;
+            }
+
+            const shouldPreserveListView = document.body.classList.contains('pwa-mobile-mode')
+                && document.body.classList.contains('pwa-list-open');
+
+            keepListInput.disabled = !shouldPreserveListView;
+        };
 
         const syncPwaMobileListMode = () => {
             const enableMobilePwaMode = isStandalone && mobileViewport.matches && !landscapeViewport.matches && !isArchivePage && !isPaymentPage;
@@ -1574,6 +1589,8 @@ if ($isPrintMode) {
             if (pwaMobileMenu) {
                 pwaMobileMenu.hidden = !enableMobilePwaMode;
             }
+
+            syncKeepListInput();
         };
 
         if (isStandalone && installHint) {
@@ -1627,12 +1644,20 @@ if ($isPrintMode) {
         if (openListViewButton) {
             openListViewButton.addEventListener('click', () => {
                 document.body.classList.add('pwa-list-open');
+                syncKeepListInput();
             });
         }
 
         if (closeListViewButton) {
             closeListViewButton.addEventListener('click', () => {
                 document.body.classList.remove('pwa-list-open');
+                syncKeepListInput();
+            });
+        }
+
+        if (filterForm) {
+            filterForm.addEventListener('submit', () => {
+                syncKeepListInput();
             });
         }
 
@@ -1652,6 +1677,7 @@ if ($isPrintMode) {
 
         if (shouldKeepListOpen && document.body.classList.contains('pwa-mobile-mode')) {
             document.body.classList.add('pwa-list-open');
+            syncKeepListInput();
 
             if (window.history && typeof window.history.replaceState === 'function') {
                 const nextUrl = new URL(window.location.href);
