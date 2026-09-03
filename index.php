@@ -11,6 +11,19 @@ $keepListOpen = (string)($_GET['keep_list'] ?? '') === '1';
 $isArchivePage = $currentPage === 'arsip';
 $isPaymentPage = $currentPage === 'pembayaran';
 $isMainPage = !$isArchivePage && !$isPaymentPage;
+$printAccessRedirectParams = [];
+if ($currentPage !== '') {
+    $printAccessRedirectParams['page'] = $currentPage;
+}
+foreach (['q', 'status', 'created_from', 'created_until'] as $paramName) {
+    $paramValue = trim((string)($_GET[$paramName] ?? ''));
+    if ($paramValue !== '') {
+        $printAccessRedirectParams[$paramName] = $paramValue;
+    }
+}
+if ($keepListOpen && $isMainPage) {
+    $printAccessRedirectParams['keep_list'] = '1';
+}
 $editId = isset($_GET['edit']) ? (int)$_GET['edit'] : 0;
 $editData = $editId > 0 ? findNota($pdo, $editId) : null;
 $payData = null;
@@ -35,6 +48,11 @@ if ($isArchivePage && !canViewArchive($currentUser)) {
 if ($isPaymentPage && !canViewPaymentStatus($currentUser)) {
     setFlash('error', 'Status pembayaran hanya bisa dibuka oleh owner dan admin.');
     redirectToIndex();
+}
+
+if ($isPrintMode && !canPrintNotes($currentUser)) {
+    setFlash('error', 'Tombol print hanya bisa diakses oleh owner, manager, dan staff.');
+    redirectToIndex($printAccessRedirectParams);
 }
 
 if ($editId > 0 && !$editData) {
@@ -864,7 +882,9 @@ if ($isPrintMode) {
                     <div class="filter-actions-row">
                         <button type="submit" class="btn btn-primary">Filter</button>
                         <a href="<?= $isArchivePage ? 'index.php?page=arsip' : ($isPaymentPage ? 'index.php?page=pembayaran' : 'index.php') ?>" class="btn btn-secondary">Reset</a>
-                        <a href="<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary" target="_blank" rel="noopener">Print</a>
+                        <?php if (canPrintNotes($currentUser)): ?>
+                            <a href="<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary" target="_blank" rel="noopener">Print</a>
+                        <?php endif; ?>
                     </div>
                 </form>
 

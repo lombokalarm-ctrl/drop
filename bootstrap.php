@@ -670,6 +670,11 @@ function canViewPaymentStatus(array $user): bool
     return in_array($user['role'], ['owner', 'manager', 'staff'], true);
 }
 
+function canPrintNotes(array $user): bool
+{
+    return in_array($user['role'], ['owner', 'manager', 'staff'], true);
+}
+
 function canDeletePermanent(array $user): bool
 {
     return hasOwnerAccess($user);
