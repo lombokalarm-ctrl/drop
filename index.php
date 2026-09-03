@@ -604,7 +604,7 @@ if ($isPrintMode) {
             <div class="hero-actions">
                 <?php if ($isPrintMode): ?>
                     <button type="button" class="btn btn-primary" onclick="window.print()">Print Sekarang</button>
-                    <p class="install-hint">Format cetak A4 landscape dengan pemisah per tanggal pembuatan.</p>
+                    <p class="install-hint">Format cetak A4 portrait dengan pemisah per tanggal pembuatan.</p>
                 <?php else: ?>
                     <button type="button" class="btn btn-primary btn-install" id="installAppButton" hidden>Install App</button>
                     <p class="install-hint" id="installHint">Bisa dipasang ke layar utama Android dari browser.</p>
