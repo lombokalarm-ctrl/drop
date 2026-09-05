@@ -78,6 +78,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'pembayaran' => ['page' => 'pembayaran'],
         default => [],
     };
+    foreach (['q', 'status', 'created_from', 'created_until'] as $filterParam) {
+        $filterValue = trim((string)($_POST[$filterParam] ?? ''));
+        if ($filterValue !== '') {
+            $redirectParams[$filterParam] = $filterValue;
+        }
+    }
+    if ($redirectPage === '' && (string)($_POST['keep_list'] ?? '') === '1') {
+        $redirectParams['keep_list'] = '1';
+    }
 
     if ($action === 'archive') {
         $id = (int)($_POST['id'] ?? 0);
@@ -541,9 +550,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== []) {
 $listTitle = $isArchivePage ? 'Daftar Arsip Nota' : ($isPaymentPage ? 'Status Pembayaran' : 'Daftar Nota');
 $printTitle = $isArchivePage ? 'Cetak Arsip Nota' : ($isPaymentPage ? 'Cetak Status Pembayaran' : 'Cetak Daftar Nota');
 $printBaseParams = [];
+$resetBaseParams = [];
 
 if ($currentPage !== '') {
     $printBaseParams['page'] = $currentPage;
+    $resetBaseParams['page'] = $currentPage;
 }
 if ($filters['q'] !== '') {
     $printBaseParams['q'] = $filters['q'];
@@ -558,7 +569,13 @@ if ($filters['created_until'] !== '') {
     $printBaseParams['created_until'] = $filters['created_until'];
 }
 
+$shouldKeepResetListOpen = $keepListOpen && $isMainPage;
+if ($shouldKeepResetListOpen) {
+    $resetBaseParams['keep_list'] = '1';
+}
+
 $printUrl = 'index.php?' . http_build_query(array_merge($printBaseParams, ['print' => '1']));
+$resetUrl = 'index.php' . ($resetBaseParams !== [] ? '?' . http_build_query($resetBaseParams) : '');
 $backFromPrintUrl = 'index.php' . ($printBaseParams !== [] ? '?' . http_build_query($printBaseParams) : '');
 $printRowsByDate = [];
 $printRowNumber = 1;
@@ -881,7 +898,7 @@ if ($isPrintMode) {
                     </div>
                     <div class="filter-actions-row">
                         <button type="submit" class="btn btn-primary">Filter</button>
-                        <a href="<?= $isArchivePage ? 'index.php?page=arsip' : ($isPaymentPage ? 'index.php?page=pembayaran' : 'index.php') ?>" class="btn btn-secondary">Reset</a>
+                        <a href="<?= htmlspecialchars($resetUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">Reset</a>
                         <?php if (canPrintNotes($currentUser)): ?>
                             <a href="<?= htmlspecialchars($printUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary" target="_blank" rel="noopener">Print</a>
                         <?php endif; ?>
@@ -1013,6 +1030,13 @@ if ($isPrintMode) {
                                                             <input type="hidden" name="action" value="archive">
                                                             <input type="hidden" name="page" value="">
                                                             <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
+                                                            <input type="hidden" name="q" value="<?= htmlspecialchars($filters['q'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="status" value="<?= htmlspecialchars($filters['status'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="created_from" value="<?= htmlspecialchars($filters['created_from'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="created_until" value="<?= htmlspecialchars($filters['created_until'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <?php if ($keepListOpen && $isMainPage): ?>
+                                                                <input type="hidden" name="keep_list" value="1">
+                                                            <?php endif; ?>
                                                             <button type="submit" class="btn btn-small btn-warning">Arsipkan</button>
                                                         </form>
                                                     <?php endif; ?>
@@ -1052,6 +1076,13 @@ if ($isPrintMode) {
                         <input type="hidden" name="action" value="pay">
                         <input type="hidden" name="page" value="<?= $isPaymentPage ? 'pembayaran' : '' ?>">
                         <input type="hidden" name="id" id="payModalId" value="<?= $payData ? (int)$payData['id'] : 0 ?>">
+                        <input type="hidden" name="q" value="<?= htmlspecialchars($filters['q'], ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="status" value="<?= htmlspecialchars($filters['status'], ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="created_from" value="<?= htmlspecialchars($filters['created_from'], ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="created_until" value="<?= htmlspecialchars($filters['created_until'], ENT_QUOTES, 'UTF-8') ?>">
+                        <?php if ($keepListOpen && $isMainPage): ?>
+                            <input type="hidden" name="keep_list" value="1">
+                        <?php endif; ?>
 
                         <div class="field-grid">
                             <label>
@@ -1119,6 +1150,13 @@ if ($isPrintMode) {
                         <input type="hidden" name="action" value="edit_payment">
                         <input type="hidden" name="page" value="<?= $isPaymentPage ? 'pembayaran' : '' ?>">
                         <input type="hidden" name="id" id="editPaymentModalId" value="<?= $editPaymentData ? (int)$editPaymentData['id'] : 0 ?>">
+                        <input type="hidden" name="q" value="<?= htmlspecialchars($filters['q'], ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="status" value="<?= htmlspecialchars($filters['status'], ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="created_from" value="<?= htmlspecialchars($filters['created_from'], ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="created_until" value="<?= htmlspecialchars($filters['created_until'], ENT_QUOTES, 'UTF-8') ?>">
+                        <?php if ($keepListOpen && $isMainPage): ?>
+                            <input type="hidden" name="keep_list" value="1">
+                        <?php endif; ?>
 
                         <div class="field-grid">
                             <label>
