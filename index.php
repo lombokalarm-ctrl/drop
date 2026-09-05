@@ -11,13 +11,12 @@ $keepListOpen = (string)($_GET['keep_list'] ?? '') === '1';
 $isArchivePage = $currentPage === 'arsip';
 $isPaymentPage = $currentPage === 'pembayaran';
 $isMainPage = !$isArchivePage && !$isPaymentPage;
-$showMainInputSection = !$isMainPage || !$keepListOpen;
-$showMainListSection = !$isMainPage || $keepListOpen;
+$showStandaloneMainListView = $isMainPage && $keepListOpen;
+$showMainInputSection = !$showStandaloneMainListView;
+$showMainListSection = true;
 $layoutClass = 'layout';
 if ($isMainPage && !$keepListOpen) {
     $layoutClass .= ' layout-main-input';
-} elseif ($isMainPage && $keepListOpen) {
-    $layoutClass .= ' layout-list-only';
 }
 $mainInputUrl = 'index.php';
 $mainListUrl = 'index.php?keep_list=1';
@@ -801,7 +800,9 @@ if ($isPrintMode) {
                 <?php endif; ?>
             <?php endif; ?>
 
+            <?php if (!$showStandaloneMainListView): ?>
             <div class="<?= htmlspecialchars($layoutClass, ENT_QUOTES, 'UTF-8') ?>">
+            <?php endif; ?>
             <?php if ($showMainInputSection): ?>
             <section class="card form-card">
                 <?php if ($isMainPage): ?>
@@ -884,7 +885,7 @@ if ($isPrintMode) {
             <?php endif; ?>
 
             <?php if ($showMainListSection): ?>
-            <section class="card table-card">
+            <section class="card table-card<?= $showStandaloneMainListView ? ' browser-list-view' : '' ?>">
                 <div class="section-head">
                     <div class="table-head-main">
                         <h2><?= $isArchivePage ? 'Daftar Arsip Nota' : ($isPaymentPage ? 'Status Pembayaran' : 'Daftar Nota') ?></h2>
@@ -1073,7 +1074,9 @@ if ($isPrintMode) {
                 </div>
             </section>
             <?php endif; ?>
+            <?php if (!$showStandaloneMainListView): ?>
             </div>
+            <?php endif; ?>
         <?php endif; ?>
 
         <?php if (!$isArchivePage && !$isPrintMode): ?>

@@ -241,10 +241,6 @@ input[data-lowercase-name] {
     grid-template-columns: 360px;
 }
 
-.layout.layout-list-only {
-    grid-template-columns: minmax(0, 1fr);
-}
-
 .form-card,
 .table-card {
     padding: 16px;
@@ -255,7 +251,7 @@ input[data-lowercase-name] {
     overflow: hidden;
 }
 
-.layout.layout-list-only .table-card {
+.browser-list-view {
     width: 100%;
 }
 
@@ -1011,6 +1007,10 @@ body.print-mode {
 }
 
 @media (max-width: 720px) {
+    .browser-list-menu {
+        display: none !important;
+    }
+
     body.pwa-mobile-mode .pwa-mobile-menu {
         display: flex;
     }
@@ -1061,7 +1061,15 @@ body.print-mode {
 }
 
 @media (min-width: 721px) {
+    .pwa-mobile-menu {
+        display: none !important;
+    }
+
     .browser-list-menu {
         display: block;
+    }
+
+    .layout.layout-main-input .table-card {
+        display: none;
     }
 }
