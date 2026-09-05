@@ -11,6 +11,16 @@ $keepListOpen = (string)($_GET['keep_list'] ?? '') === '1';
 $isArchivePage = $currentPage === 'arsip';
 $isPaymentPage = $currentPage === 'pembayaran';
 $isMainPage = !$isArchivePage && !$isPaymentPage;
+$showMainInputSection = !$isMainPage || !$keepListOpen;
+$showMainListSection = !$isMainPage || $keepListOpen;
+$layoutClass = 'layout';
+if ($isMainPage && !$keepListOpen) {
+    $layoutClass .= ' layout-main-input';
+} elseif ($isMainPage && $keepListOpen) {
+    $layoutClass .= ' layout-list-only';
+}
+$mainInputUrl = 'index.php';
+$mainListUrl = 'index.php?keep_list=1';
 $printAccessRedirectParams = [];
 if ($currentPage !== '') {
     $printAccessRedirectParams['page'] = $currentPage;
@@ -647,7 +657,7 @@ if ($isPrintMode) {
             </div>
         </section>
 
-        <?php if (!$isPrintMode): ?>
+        <?php if (!$isPrintMode && !($isMainPage && $keepListOpen)): ?>
             <section class="summary-grid">
                 <article class="card summary-card">
                     <span class="summary-label">Total Data</span>
@@ -784,9 +794,15 @@ if ($isPrintMode) {
                 <section class="card pwa-mobile-menu" id="pwaMobileMenu" hidden>
                     <button type="button" class="btn btn-primary" id="openListViewButton">Daftar Nota</button>
                 </section>
+                <?php if (!$keepListOpen): ?>
+                    <section class="card browser-list-menu">
+                        <a href="<?= htmlspecialchars($mainListUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-primary">Daftar Nota</a>
+                    </section>
+                <?php endif; ?>
             <?php endif; ?>
 
-            <div class="layout">
+            <div class="<?= htmlspecialchars($layoutClass, ENT_QUOTES, 'UTF-8') ?>">
+            <?php if ($showMainInputSection): ?>
             <section class="card form-card">
                 <?php if ($isMainPage): ?>
                     <div class="section-head">
@@ -865,7 +881,9 @@ if ($isPrintMode) {
                     </form>
                 <?php endif; ?>
             </section>
+            <?php endif; ?>
 
+            <?php if ($showMainListSection): ?>
             <section class="card table-card">
                 <div class="section-head">
                     <div class="table-head-main">
@@ -873,7 +891,11 @@ if ($isPrintMode) {
                         <span class="table-count"><?= count($rows) ?> data</span>
                     </div>
                     <?php if ($isMainPage): ?>
-                        <button type="button" class="btn btn-secondary mobile-list-back" id="closeListViewButton">Kembali ke Input</button>
+                        <?php if ($keepListOpen): ?>
+                            <a href="<?= htmlspecialchars($mainInputUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary mobile-list-back" id="closeListViewButton">Kembali ke Input</a>
+                        <?php else: ?>
+                            <button type="button" class="btn btn-secondary mobile-list-back" id="closeListViewButton">Kembali ke Input</button>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
 
@@ -884,7 +906,7 @@ if ($isPrintMode) {
                         <input type="hidden" name="page" value="pembayaran">
                     <?php endif; ?>
                     <?php if ($isMainPage): ?>
-                        <input type="hidden" name="keep_list" value="1" id="keepListInput" disabled>
+                        <input type="hidden" name="keep_list" value="1" id="keepListInput" <?= $keepListOpen ? '' : 'disabled' ?>>
                     <?php endif; ?>
                     <input type="search" name="q" value="<?= htmlspecialchars($filters['q'], ENT_QUOTES, 'UTF-8') ?>" placeholder="Cari outlet, sales, pengirim" class="filter-search">
                     <select name="status" class="filter-status">
@@ -1050,6 +1072,7 @@ if ($isPrintMode) {
                     </table>
                 </div>
             </section>
+            <?php endif; ?>
             </div>
         <?php endif; ?>
 

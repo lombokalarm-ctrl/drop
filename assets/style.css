@@ -124,6 +124,11 @@ input[data-lowercase-name] {
     margin-bottom: 14px;
 }
 
+.browser-list-menu {
+    display: none;
+    margin-bottom: 14px;
+}
+
 .pwa-mobile-menu strong {
     display: block;
     margin-bottom: 4px;
@@ -232,6 +237,14 @@ input[data-lowercase-name] {
     min-width: 0;
 }
 
+.layout.layout-main-input {
+    grid-template-columns: 360px;
+}
+
+.layout.layout-list-only {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 .form-card,
 .table-card {
     padding: 16px;
@@ -240,6 +253,10 @@ input[data-lowercase-name] {
 
 .table-card {
     overflow: hidden;
+}
+
+.layout.layout-list-only .table-card {
+    width: 100%;
 }
 
 .section-head {
@@ -1040,5 +1057,11 @@ body.print-mode {
     .password-toggle {
         width: 34px;
         height: 34px;
+    }
+}
+
+@media (min-width: 721px) {
+    .browser-list-menu {
+        display: block;
     }
 }
