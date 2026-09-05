@@ -790,12 +790,9 @@ if ($isPrintMode) {
             </section>
         <?php else: ?>
             <?php if ($isMainPage): ?>
-                <section class="card pwa-mobile-menu" id="pwaMobileMenu" hidden>
-                    <button type="button" class="btn btn-primary" id="openListViewButton">Daftar Nota</button>
-                </section>
                 <?php if (!$keepListOpen): ?>
-                    <section class="card browser-list-menu">
-                        <a href="<?= htmlspecialchars($mainListUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-primary">Daftar Nota</a>
+                    <section class="card pwa-mobile-menu" id="pwaMobileMenu">
+                        <a href="<?= htmlspecialchars($mainListUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-primary" id="openListViewButton">Daftar Nota</a>
                     </section>
                 <?php endif; ?>
             <?php endif; ?>
@@ -1726,9 +1723,12 @@ if ($isPrintMode) {
         });
 
         if (openListViewButton) {
-            openListViewButton.addEventListener('click', () => {
-                document.body.classList.add('pwa-list-open');
-                syncKeepListInput();
+            openListViewButton.addEventListener('click', (event) => {
+                if (document.body.classList.contains('pwa-mobile-mode')) {
+                    event.preventDefault();
+                    document.body.classList.add('pwa-list-open');
+                    syncKeepListInput();
+                }
             });
         }
 
