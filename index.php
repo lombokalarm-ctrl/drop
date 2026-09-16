@@ -957,10 +957,11 @@ if ($isPrintMode) {
                             <?php else: ?>
                                 <?php foreach ($rows as $row): ?>
                                     <?php $remainingAmount = getRemainingAmount((int)$row['invoice_value'], (int)$row['payment_amount']); ?>
+                                    <?php $isPaidRow = (string)$row['payment_status'] === 'sudah_bayar'; ?>
                                     <?php $outletLabel = $row['outlet_name'] . ' (' . $row['outlet_code'] . ')'; ?>
                                     <?php $deleteConfirmMessage = 'Hapus permanen data arsip outlet ' . $outletLabel . '?'; ?>
                                     <?php $archiveConfirmMessage = 'Arsipkan data nota outlet ' . $outletLabel . '?'; ?>
-                                    <tr>
+                                    <tr class="<?= $isPaidRow ? 'note-row-paid' : '' ?>">
                                         <td><?= formatDateId($row['created_at']) ?></td>
                                         <td>
                                             <?= htmlspecialchars($outletLabel, ENT_QUOTES, 'UTF-8') ?>

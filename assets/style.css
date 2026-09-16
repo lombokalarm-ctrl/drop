@@ -657,6 +657,10 @@ tbody td small {
     color: var(--success);
 }
 
+.note-row-paid td {
+    color: #2f7f5c;
+}
+
 .empty-state {
     text-align: center;
     color: var(--muted);
