@@ -658,7 +658,7 @@ tbody td small {
 }
 
 .note-row-paid td {
-    color: #2f7f5c;
+    color: var(--primary);
 }
 
 .empty-state {
